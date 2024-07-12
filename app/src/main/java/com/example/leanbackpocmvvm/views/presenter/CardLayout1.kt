@@ -24,13 +24,21 @@ class CardLayout1 : Presenter() {
         val cardView = viewHolder.view as NewVideoCardView
         val customItem = item as? MainViewModel.CustomRowItemX
         if (customItem != null) {
-            cardView.bind(customItem, VideoPlaybackState.Stopped)
+            cardView.setImage(customItem.contentData.imageUrl, customItem.contentData.width, customItem.contentData.height)
+            cardView.setMainImageDimensions(
+                customItem.contentData.isLandscape,
+                customItem.contentData.isPortrait,
+                customItem.contentData.width,
+                customItem.contentData.height
+            )
+            cardView.tag = customItem.rowItemX.tid
         }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
         val cardView = viewHolder.view as NewVideoCardView
-        cardView.updateVideoPlaybackState(VideoPlaybackState.Stopped)
+        cardView.stopVideoPlayback()
+        //cardView.updateVideoPlaybackState(VideoPlaybackState.Stopped)
         // No need to do anything here, as video playback is managed by ViewModel
     }
 }

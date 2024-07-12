@@ -1,20 +1,24 @@
 package com.example.leanbackpocmvvm.views.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.*
 import androidx.leanback.widget.*
+import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
+import com.example.leanbackpocmvvm.utils.ExoPlayerManager.Companion.TAG
+import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+@UnstableApi
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: MainRepository,
@@ -37,13 +41,16 @@ class MainViewModel @Inject constructor(
     private val _videoPlaybackState = MutableLiveData<VideoPlaybackState>()
     val videoPlaybackState: LiveData<VideoPlaybackState> = _videoPlaybackState
 
-    data class CustomRowItemX(val rowItemX: RowItemX, val layout: String) {
+    private val _playVideoCommand = MutableLiveData<PlayVideoCommand>()
+    val playVideoCommand: LiveData<PlayVideoCommand> = _playVideoCommand
+
+    data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowHeader: String) {
         val contentData: ContentData
             get() = ContentData(
                 imageUrl = if (layout == "landscape") rowItemX.poster else rowItemX.portrait ?: "",
                 width = rowItemX.tileWidth?.toIntOrNull() ?: 300,
                 height = rowItemX.tileHeight?.toIntOrNull() ?: 225,
-                isLandscape = layout != "landscape",
+                isLandscape = layout == "landscape" && rowHeader == "bannerAd",
                 isPortrait = layout == "portrait"
             )
     }
@@ -78,7 +85,8 @@ class MainViewModel @Inject constructor(
                 val layout = myData2.rows[i].rowLayout
                 val s = myData2.rows[i].rowItems.size
                 for (j in 0 until s) {
-                    val customRowItem = CustomRowItemX(myData2.rows[i].rowItems[j], layout)
+                    val customRowItem =
+                        CustomRowItemX(myData2.rows[i].rowItems[j], layout, headerString)
                     gridRowAdapter.add(customRowItem)
                 }
 
@@ -104,12 +112,25 @@ class MainViewModel @Inject constructor(
     }
 
     fun onItemSelected(item: CustomRowItemX) {
-        exoPlayerManager.releasePlayer() // Stop previous video
         item.rowItemX.videoUrl?.let { videoUrl ->
-            coroutineScope.launch {
-                delay(500) // Reduced delay for faster response
-                _videoPlaybackState.postValue(VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl))
+            Log.d(TAG, "MainViewModel: Selected item with video URL: $videoUrl")
+            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+
+            _playVideoCommand.value = PlayVideoCommand(videoUrl) { cardView ->
+                exoPlayerManager.playVideo(videoUrl, cardView) {
+                    _videoPlaybackState.value = VideoPlaybackState.Stopped
+                }
             }
+        }
+    }
+
+    // Not in Use but may required later
+    fun setupVideoPlayback(item: CustomRowItemX, cardView: NewVideoCardView) {
+        item.rowItemX.videoUrl?.let { videoUrl ->
+            cardView.setupForVideoPlayback(exoPlayerManager, videoUrl) {
+                _videoPlaybackState.value = VideoPlaybackState.Stopped
+            }
+            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
         }
     }
 
@@ -138,4 +159,9 @@ data class ContentData(
     val height: Int,
     val isLandscape: Boolean,
     val isPortrait: Boolean
+)
+
+data class PlayVideoCommand(
+    val videoUrl: String,
+    val playAction: (NewVideoCardView) -> Unit
 )

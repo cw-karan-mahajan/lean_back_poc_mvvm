@@ -2668,7 +2668,6 @@
       "rowLayout": "landscape",
       "rowItems": [
         {
-          "mediaType": "bannerAd",
           "tileType": "typeAD",
           "tid": "5daae912e2f82960ca78b394",
           "title": "TV9 Bharatvarsh_MB2_prime",
@@ -2705,7 +2704,6 @@
           "tileHeight": "313"
         },
         {
-          "mediaType": "bannerAd",
           "tileType": "typeAD",
           "tid": "641054975139e319f15c803e",
           "title": "India TV India TV - JDUMeet_29Dec_MB2_prime",
@@ -2743,7 +2741,6 @@
           "tileHeight": "313"
         },
         {
-          "mediaType": "bannerAd",
           "tileType": "typeAD",
           "tid": "601788ec75a35256efa6c7fa",
           "title": "Republic Bharat_MB_prime",
@@ -2780,7 +2777,6 @@
           "showTileInfo": "false"
         },
         {
-          "mediaType": "bannerAd",
           "tileType": "typeAD",
           "tid": "5b079d1517de705809cfe2b0",
           "title": "ABP Majha_MB2_prime",
@@ -2817,7 +2813,6 @@
           "showTileInfo": "false"
         },
         {
-          "mediaType": "bannerAd",
           "tileType": "typeAD",
           "tid": "5a549fd75f88c535a80decac",
           "title": "Republic TV_MB_prime",
@@ -2854,7 +2849,6 @@
           "showTileInfo": "false"
         },
         {
-          "mediaType": "bannerAd",
           "tileType": "typeAD",
           "tid": "5b079ed817de705809cfe332",
           "title": "ABP News_MB2_prime",
