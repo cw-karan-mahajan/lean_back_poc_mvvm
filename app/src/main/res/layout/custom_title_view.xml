@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <ImageView
+        android:id="@+id/profile_app"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="40dp"
+        android:background="@drawable/focus_onselect_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusRight="@id/search_logo"
+        android:padding="4dp"
+        android:src="@drawable/profile_white"
+        android:visibility="visible"
+        tools:text="My beautiful Title" />
+
+    <ImageView
+        android:id="@+id/search_logo"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="100dp"
+        android:layout_marginEnd="24dp"
+        android:background="@drawable/focus_onselect_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@id/profile_app"
+        android:nextFocusRight="@id/settinglogo"
+        android:padding="9dp"
+        android:src="@drawable/search_filled"
+        android:textAllCaps="true"
+        android:textSize="20sp"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/settinglogo"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_toRightOf="@id/search_logo"
+        android:background="@drawable/focus_onselect_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusRight="@id/wifilogo"
+        android:padding="9dp"
+        android:src="@drawable/setting_white"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/wifilogo"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginLeft="15dp"
+        android:layout_toRightOf="@id/settinglogo"
+        android:background="@drawable/focus_onselect_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@id/settinglogo"
+        android:nextFocusRight="@id/inputlogo"
+        android:padding="9dp"
+        android:src="@drawable/wifi_connected_white_filled"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/inputlogo"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginLeft="15dp"
+        android:layout_toRightOf="@id/wifilogo"
+        android:background="@drawable/focus_onselect_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@id/wifilogo"
+        android:nextFocusRight="@id/allappslogo"
+        android:padding="12dp"
+        android:src="@drawable/input_filled"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/allappslogo"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginLeft="15dp"
+        android:layout_toRightOf="@id/inputlogo"
+        android:background="@drawable/focus_onselect_bg"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:nextFocusLeft="@id/inputlogo"
+        android:padding="9dp"
+        android:src="@drawable/all_apps_white"
+        android:visibility="visible" />
+
+    <ImageView
+        android:id="@+id/logo"
+        android:layout_width="150dp"
+        android:layout_height="50dp"
+        android:layout_alignParentEnd="true"
+        android:layout_marginEnd="4dp"
+        android:layout_toStartOf="@id/settinglogo"
+        android:padding="4dp"
+        android:src="@drawable/cloudtv_white"
+        android:visibility="visible" />
+
+
+</merge>
