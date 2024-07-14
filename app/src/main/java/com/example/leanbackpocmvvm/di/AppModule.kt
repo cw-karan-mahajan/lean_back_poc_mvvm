@@ -1,6 +1,7 @@
 package com.example.leanbackpocmvvm.di
 
 import android.content.Context
+import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.google.gson.Gson
@@ -41,6 +42,7 @@ object AppModule {
         return MainRepository(context, gson)
     }
 
+    @UnstableApi
     @Provides
     @Singleton
     fun provideExoPlayerManager(

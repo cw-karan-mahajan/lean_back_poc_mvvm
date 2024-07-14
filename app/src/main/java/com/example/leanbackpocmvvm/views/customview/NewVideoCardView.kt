@@ -147,7 +147,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         onVideoEnded: () -> Unit
     ) {
         // This method will be called when we want to prepare the view for video playback
-        exoPlayerManager.playVideo(videoUrl, this, onVideoEnded)
+        //exoPlayerManager.playVideo(videoUrl, this, onVideoEnded)
     }
 
     fun setExoPlayerManager(manager: ExoPlayerManager) {
