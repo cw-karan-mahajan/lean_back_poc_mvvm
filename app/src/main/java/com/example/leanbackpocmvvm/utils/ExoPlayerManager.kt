@@ -1,9 +1,10 @@
 package com.example.leanbackpocmvvm.utils
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.Surface
-import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.C
@@ -16,18 +17,17 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+
 
 @UnstableApi
 @Singleton
@@ -37,8 +37,9 @@ class ExoPlayerManager @Inject constructor(
 ) {
     private var exoPlayer: ExoPlayer? = null
     private var currentPlayingView: NewVideoCardView? = null
-    private var isPlayingVideo = false
-    private var hasVideoEnded = false
+    private var isPlayingVideo = AtomicBoolean(false)
+    private var hasVideoEnded = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val simpleCache: SimpleCache by lazy {
         SimpleCache(
             File(context.cacheDir, "media"),
@@ -46,37 +47,104 @@ class ExoPlayerManager @Inject constructor(
         )
     }
 
-    fun playVideo(videoUrl: String, cardView: NewVideoCardView, onVideoEnded: () -> Unit) {
-        //Log.d(TAG, "Attempting to play video: $videoUrl")
-        coroutineScope.launch(Dispatchers.Main) {
-            releasePlayer()
+    private val isReleasing = AtomicBoolean(false)
 
-            if (exoPlayer == null)
-                exoPlayer = createExoPlayer(onVideoEnded)
+    suspend fun playVideo(videoUrl: String, cardView: NewVideoCardView) {
+        var retryCount = 0
+        val maxRetries = 1
+        withContext(Dispatchers.Main) {
+            Log.d(TAG, "Starting playVideo for URL: $videoUrl")
 
-            val upstreamFactory = DefaultDataSource.Factory(context)
-            val cacheDataSourceFactory = CacheDataSource.Factory()
-                .setCache(simpleCache)
-                .setUpstreamDataSourceFactory(upstreamFactory)
-            val source = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
-                .createMediaSource(MediaItem.fromUri(videoUrl))
+            try {
+                while (isReleasing.get()) {
+                    Log.d(TAG, "Waiting for player release to complete")
+                    delay(100)
+                }
 
-            exoPlayer?.let { player ->
-                player.setMediaSource(source)
-                player.prepare()
+                if (isPlayingVideo.get()) {
+                    Log.d(TAG, "Video is already playing, releasing player")
+                    releasePlayer()
+                }
 
-                cardView.startVideoPlayback(player)
-                currentPlayingView = cardView
+                cardView.prepareForVideoPlayback()
+                delay(500) // Give some time for the layout to update
 
-                player.playWhenReady = true
-                isPlayingVideo = true
-                hasVideoEnded = false
+                while (retryCount < maxRetries) {
+                    try {
+                        Log.d(TAG, "Attempt ${retryCount + 1} to play video")
+                        if (exoPlayer == null) {
+                            Log.d(TAG, "Creating new ExoPlayer instance")
+                            exoPlayer = createExoPlayer()
+                        }
+
+                        val upstreamFactory = DefaultDataSource.Factory(context)
+                        val cacheDataSourceFactory = CacheDataSource.Factory()
+                            .setCache(simpleCache)
+                            .setUpstreamDataSourceFactory(upstreamFactory)
+                        val source = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
+                            .createMediaSource(MediaItem.fromUri(videoUrl))
+
+                        exoPlayer?.let { player ->
+                            Log.d(TAG, "Setting media source and preparing player")
+                            player.setMediaSource(source)
+                            player.prepare()
+
+                            Log.d(TAG, "About to call getVideoSurface")
+                            val surface = withTimeoutOrNull(15000) { // 15 second timeout
+                                suspendCancellableCoroutine<Surface?> { continuation ->
+                                    cardView.getVideoSurface { retrievedSurface ->
+                                        Log.d(TAG, "Received surface from cardView: ${retrievedSurface != null}")
+                                        if (!continuation.isCompleted) {
+                                            continuation.resume(retrievedSurface)
+                                        }
+                                    }
+                                }
+                            }
+                            Log.d(TAG, "After getVideoSurface call, surface: ${surface != null}")
+
+                            if (surface != null && surface.isValid) {
+                                Log.d(TAG, "Setting video surface and starting playback")
+                                player.setVideoSurface(surface)
+                                cardView.startVideoPlayback(player)
+                                currentPlayingView = cardView
+                                player.playWhenReady = true
+                                isPlayingVideo.set(true)
+                                hasVideoEnded.set(false)
+
+                                Log.d(TAG, "Video playback started successfully")
+                                return@withContext
+                            } else {
+                                Log.e(TAG, "Invalid or null surface received. PlayerView state: ${cardView.getPlayerViewState()}")
+                                cardView.resetPlayerView()
+                                delay(1000) // Wait a bit before retrying
+                                retryCount++
+                            }
+                        } ?: run {
+                            Log.e(TAG, "ExoPlayer is null")
+                            throw IllegalStateException("ExoPlayer is null")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error playing video (attempt ${retryCount + 1}): ${e.message}")
+                        e.printStackTrace()
+                        releasePlayer()
+                        cardView.resetPlayerView()
+                        if (retryCount < maxRetries - 1) {
+                            delay(1000)
+                            retryCount++
+                        } else {
+                            throw e
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to play video after $maxRetries attempts", e)
+                cardView.showThumbnail()
+                cardView.shrinkCard()
             }
         }
     }
 
-    private fun createExoPlayer(onVideoEnded: () -> Unit): ExoPlayer {
-        Log.d(TAG, "ExoPlayerManager: Creating new ExoPlayer instance")
+    private fun createExoPlayer(): ExoPlayer {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
@@ -86,13 +154,14 @@ class ExoPlayerManager @Inject constructor(
             )
             .build()
 
-        return ExoPlayer.Builder(context)
-            .setRenderersFactory(
-                DefaultRenderersFactory(context).setExtensionRendererMode(
-                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                )
-            )
+        val renderersFactory = DefaultRenderersFactory(context).apply {
+            setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+            setMediaCodecSelector(createMediaCodecSelector())
+        }
+
+        return ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
+            .setLooper(mainHandler.looper)
             .build()
             .apply {
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
@@ -100,51 +169,80 @@ class ExoPlayerManager @Inject constructor(
 
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
-                        Log.d(TAG, "ExoPlayer state changed to: $state")
-                        when (state) {
-                            Player.STATE_ENDED -> {
-                                hasVideoEnded = true
-                                isPlayingVideo = false
-                                currentPlayingView?.showThumbnail()
-                                currentPlayingView?.shrinkCard()
-                                onVideoEnded()
-                                Log.d(TAG, "ExoPlayer playback ended")
-                            }
-
-                            Player.STATE_READY -> {
-                                isPlayingVideo = playWhenReady
-                                currentPlayingView?.ensureVideoVisible()
-                                Log.d(TAG, "ExoPlayer ready, playWhenReady: $playWhenReady")
+                        mainHandler.post {
+                            when (state) {
+                                Player.STATE_ENDED -> {
+                                    Log.d(TAG, "Playback ended")
+                                    hasVideoEnded.set(true)
+                                    isPlayingVideo.set(false)
+                                    currentPlayingView?.resetPlayerView()
+                                    currentPlayingView?.shrinkCard()
+                                }
+                                Player.STATE_READY -> {
+                                    Log.d(TAG, "Player is ready")
+                                    isPlayingVideo.set(playWhenReady)
+                                    currentPlayingView?.ensureVideoVisible()
+                                }
+                                Player.STATE_BUFFERING -> Log.d(TAG, "Player is buffering")
+                                Player.STATE_IDLE -> Log.d(TAG, "Player is idle")
                             }
                         }
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e(TAG, "ExoPlayer error: ${error.message}")
-                        currentPlayingView?.showThumbnail()
-                        currentPlayingView?.shrinkCard()
-                        onVideoEnded()
+                        mainHandler.post {
+                            Log.e(TAG, "ExoPlayer error: ${error.message}")
+                            error.printStackTrace()
+                            currentPlayingView?.showThumbnail()
+                            currentPlayingView?.shrinkCard()
+                            releasePlayer()
+                        }
+                    }
+
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        Log.d(TAG, "Is playing changed: $isPlaying")
                     }
                 })
             }
     }
 
+    private fun createMediaCodecSelector(): MediaCodecSelector {
+        return MediaCodecSelector.DEFAULT.let { defaultSelector ->
+            MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
+                val decoders = defaultSelector.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+                decoders.filterNot { it.name == "OMX.MS.AVC.Decoder" }
+            }
+        }
+    }
+
     fun setVideoSurface(surface: Surface) {
-        exoPlayer?.setVideoSurface(surface)
+        mainHandler.post {
+            exoPlayer?.setVideoSurface(surface)
+        }
     }
 
     fun releasePlayer() {
-        //coroutineScope.launch(Dispatchers.Main) {
-        currentPlayingView?.showThumbnail()
-        currentPlayingView = null
-        exoPlayer?.release()
-        exoPlayer = null
-        isPlayingVideo = false
-        hasVideoEnded = false
-        // }
+        if (isReleasing.getAndSet(true)) {
+            Log.d(TAG, "ExoPlayer is already being released")
+            return
+        }
+
+        mainHandler.post {
+            try {
+                currentPlayingView?.showThumbnail()
+                currentPlayingView?.shrinkCard()
+                currentPlayingView = null
+                exoPlayer?.release()
+                exoPlayer = null
+                isPlayingVideo.set(false)
+                hasVideoEnded.set(false)
+            } finally {
+                isReleasing.set(false)
+            }
+        }
     }
 
-    fun isVideoPlaying(): Boolean = isPlayingVideo
+    fun isVideoPlaying(): Boolean = isPlayingVideo.get()
 
     companion object {
         const val TAG = "ExoPlayerManager"

@@ -1,6 +1,7 @@
 package com.example.leanbackpocmvvm.views.viewmodel
 
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.lifecycle.*
 import androidx.leanback.widget.*
 import androidx.media3.common.util.UnstableApi
@@ -14,6 +15,8 @@ import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -44,6 +47,8 @@ class MainViewModel @Inject constructor(
     private val _playVideoCommand = MutableLiveData<PlayVideoCommand>()
     val playVideoCommand: LiveData<PlayVideoCommand> = _playVideoCommand
 
+    private var itemSelectionJob: Job? = null
+
     data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowHeader: String) {
         val contentData: ContentData
             get() = ContentData(
@@ -55,12 +60,12 @@ class MainViewModel @Inject constructor(
             )
     }
 
-    fun loadData() {
+    fun loadData(lifecycleOwner: LifecycleOwner) {
         coroutineScope.launch(Dispatchers.IO) {
             _isLoading.postValue(true)
             try {
                 val myData2 = repository.getMyData()
-                createRowsAdapter(myData2)
+                createRowsAdapter(myData2, lifecycleOwner)
             } catch (e: Exception) {
                 _toastMessage.postValue("Error loading data: ${e.message}")
             } finally {
@@ -69,7 +74,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private suspend fun createRowsAdapter(myData2: MyData2) {
+    private suspend fun createRowsAdapter(myData2: MyData2, lifecycleOwner: LifecycleOwner) {
         withContext(Dispatchers.Default) {
             val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
             lrp.shadowEnabled = false
@@ -79,7 +84,7 @@ class MainViewModel @Inject constructor(
             for (i in 0 until myData2.rowCount) {
                 val headerString = myData2.rows[i].rowHeader
                 val gridItemPresenterHeader = HeaderItem(i.toLong(), headerString)
-                val mGridPresenter = CardLayout1()
+                val mGridPresenter = createCardLayout1(lifecycleOwner)
                 val gridRowAdapter = ArrayObjectAdapter(mGridPresenter)
 
                 val layout = myData2.rows[i].rowLayout
@@ -101,9 +106,12 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    fun createCardLayout1(lifecycleOwner: LifecycleOwner): CardLayout1 {
+        return CardLayout1(lifecycleOwner, exoPlayerManager)
+    }
+
     fun setNetworkStatus(isConnected: Boolean) {
         if (isConnected) {
-            loadData()
             _toastMessage.value = "Network connected"
         } else {
             _toastMessage.value = "Network disconnected"
@@ -112,25 +120,25 @@ class MainViewModel @Inject constructor(
     }
 
     fun onItemSelected(item: CustomRowItemX) {
-        item.rowItemX.videoUrl?.let { videoUrl ->
-            Log.d(TAG, "MainViewModel: Selected item with video URL: $videoUrl")
-            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+        itemSelectionJob?.cancel()
+        itemSelectionJob = viewModelScope.launch {
+            delay(300) // Debounce delay
+            item.rowItemX.videoUrl?.let { videoUrl ->
+                Log.d(TAG, "MainViewModel: Selected item with video URL: $videoUrl")
+                _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
 
-            _playVideoCommand.value = PlayVideoCommand(videoUrl) { cardView ->
-                exoPlayerManager.playVideo(videoUrl, cardView) {
-                    _videoPlaybackState.value = VideoPlaybackState.Stopped
+                _playVideoCommand.value = PlayVideoCommand(videoUrl) { cardView ->
+                    viewModelScope.launch {
+                        try {
+                            exoPlayerManager.playVideo(videoUrl, cardView)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error playing video: ${e.message}")
+                            _videoPlaybackState.value = VideoPlaybackState.Stopped
+                            _toastMessage.value = "Failed to play video. Please try again."
+                        }
+                    }
                 }
             }
-        }
-    }
-
-    // Not in Use but may required later
-    fun setupVideoPlayback(item: CustomRowItemX, cardView: NewVideoCardView) {
-        item.rowItemX.videoUrl?.let { videoUrl ->
-            cardView.setupForVideoPlayback(exoPlayerManager, videoUrl) {
-                _videoPlaybackState.value = VideoPlaybackState.Stopped
-            }
-            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
         }
     }
 
@@ -145,6 +153,11 @@ class MainViewModel @Inject constructor(
 
     fun onSearchClicked() {
         // Handle search click
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        exoPlayerManager.releasePlayer()
     }
 }
 
@@ -161,7 +174,9 @@ data class ContentData(
     val isPortrait: Boolean
 )
 
-data class PlayVideoCommand(
+@OptIn(UnstableApi::class)
+data class PlayVideoCommand
+    (
     val videoUrl: String,
     val playAction: (NewVideoCardView) -> Unit
 )
