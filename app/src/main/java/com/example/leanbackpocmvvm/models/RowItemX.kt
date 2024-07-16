@@ -28,7 +28,7 @@ data class RowItemX(
     @SerializedName("poster")
     val poster: String,
     @SerializedName("video_url")
-    val videoUrl: String,
+    val videoUrl: String? = null,
     @SerializedName("rating")
     val rating: Double,
     @SerializedName("runtime")

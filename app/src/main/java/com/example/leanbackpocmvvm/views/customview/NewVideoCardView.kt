@@ -2,20 +2,19 @@ package com.example.leanbackpocmvvm.views.customview
 
 import android.animation.ObjectAnimator
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -28,6 +27,7 @@ import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.example.leanbackpocmvvm.utils.dpToPx
+import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -47,6 +47,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private var stretchedHeight: Int = 0
     private var exoPlayerManager: ExoPlayerManager? = null
     private lateinit var lifecycleOwner: LifecycleOwner
+    private lateinit var mainViewModel: MainViewModel
+    private lateinit var tileId:String
 
     init {
         layoutParams = ViewGroup.LayoutParams(
@@ -135,8 +137,16 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         })
     }
 
+    fun setTileId(tileId:String) {
+        this.tileId = tileId
+    }
+
     fun setLifecycleOwner(owner: LifecycleOwner) {
         this.lifecycleOwner = owner
+    }
+
+    fun setMainViewModel(viewModel: MainViewModel) {
+        this.mainViewModel = viewModel
     }
 
     fun setImage(imageUrl: String, width: Int, height: Int) {
@@ -160,12 +170,13 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             when (state) {
                 is VideoPlaybackState.Playing -> {
                     if (state.itemId == tag) {
-                        exoPlayerManager?.playVideo(state.videoUrl, this@NewVideoCardView)
+                        exoPlayerManager?.playVideo(state.videoUrl, this@NewVideoCardView, tileId)
                     } else {
                         stopVideoPlayback()
                         showThumbnail()
                     }
                 }
+
                 is VideoPlaybackState.Stopped -> {
                     stopVideoPlayback()
                     showThumbnail()
@@ -226,14 +237,12 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun stopVideoPlayback() {
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            playerView.player = null
-            playerView.visibility = View.GONE
-            showThumbnail()
-            isVideoPlaying = false
-            shrinkCard()
-            updateFocusOverlayVisibility()
-        }
+        playerView.player = null
+        playerView.visibility = View.GONE
+        showThumbnail()
+        isVideoPlaying = false
+        shrinkCard()
+        updateFocusOverlayVisibility()
     }
 
     private fun resizeCard(stretch: Boolean) {
@@ -288,80 +297,18 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         })
     }
 
-    fun getVideoSurface(callback: (Surface?) -> Unit) {
-        Log.d(TAG, "getVideoSurface called. PlayerView state: ${getPlayerViewState()}")
-
-        if (playerView.visibility != View.VISIBLE) {
-            Log.d(TAG, "PlayerView not visible, making it visible")
-            playerView.visibility = View.VISIBLE
-            playerView.alpha = 1f // Make it fully visible
-        }
-
-        if (!playerView.isLaidOut) {
-            Log.d(TAG, "PlayerView not laid out yet, forcing layout")
-            playerView.measure(
-                MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY)
-            )
-            playerView.layout(0, 0, playerView.measuredWidth, playerView.measuredHeight)
-        }
-
-        getVideoSurfaceInternal(callback)
-    }
-
-    private fun getVideoSurfaceInternal(callback: (Surface?) -> Unit) {
-        val surfaceView = playerView.videoSurfaceView as? SurfaceView
-        if (surfaceView == null) {
-            Log.e(TAG, "SurfaceView is null. PlayerView state: ${getPlayerViewState()}")
-            callback(null)
-            return
-        }
-
-        val holder = surfaceView.holder
-        if (holder.surface.isValid) {
-            Log.d(TAG, "Surface is already valid, returning immediately")
-            callback(holder.surface)
-        } else {
-            Log.d(TAG, "Waiting for surface to be created. PlayerView state: ${getPlayerViewState()}")
-            val timeoutHandler = Handler(Looper.getMainLooper())
-            val timeoutRunnable = Runnable {
-                Log.e(TAG, "Surface creation timed out. PlayerView state: ${getPlayerViewState()}")
-                callback(null)
-            }
-            timeoutHandler.postDelayed(timeoutRunnable, 10000) // 10 second timeout
-
-            holder.addCallback(object : SurfaceHolder.Callback {
-                override fun surfaceCreated(holder: SurfaceHolder) {
-                    Log.d(TAG, "Surface created. PlayerView state: ${getPlayerViewState()}")
-                    timeoutHandler.removeCallbacks(timeoutRunnable)
-                    callback(holder.surface)
-                }
-
-                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                    Log.d(TAG, "Surface changed: format=$format, width=$width, height=$height. PlayerView state: ${getPlayerViewState()}")
-                }
-
-                override fun surfaceDestroyed(holder: SurfaceHolder) {
-                    Log.d(TAG, "Surface destroyed. PlayerView state: ${getPlayerViewState()}")
-                    timeoutHandler.removeCallbacks(timeoutRunnable)
-                    callback(null)
-                }
-            })
-        }
+    fun getVideoSurface(): Surface? {
+        return videoSurface
     }
 
     fun showThumbnail() {
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            playerView.visibility = View.GONE
-            imageView.visibility = View.VISIBLE
-        }
+        playerView.visibility = View.GONE
+        imageView.visibility = View.VISIBLE
     }
 
     fun ensureVideoVisible() {
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            playerView.visibility = View.VISIBLE
-            imageView.visibility = View.GONE
-        }
+        playerView.visibility = View.VISIBLE
+        imageView.visibility = View.GONE
     }
 
     private fun isCardFocused(): Boolean {
@@ -373,28 +320,22 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         focusOverlay.visibility = if (shouldBeVisible) View.VISIBLE else View.INVISIBLE
     }
 
+    fun onVideoEnded(tileId: String) {
+        mainViewModel.onVideoEnded(tileId)
+    }
+
+    fun resetPlayerView() {
+        playerView.player = null
+        playerView.visibility = View.GONE
+        showThumbnail()
+        isVideoPlaying = false
+    }
+
     fun getPlayerViewState(): String {
         return "Width: ${playerView.width}, Height: ${playerView.height}, " +
                 "Visibility: ${playerView.visibility == View.VISIBLE}, " +
                 "Is laid out: ${playerView.isLaidOut}, " +
                 "Has surface: ${playerView.videoSurfaceView != null}"
-    }
-
-    fun resetPlayerView() {
-        Log.d(TAG, "Resetting PlayerView")
-        playerView.player = null
-        playerView.visibility = View.GONE
-        showThumbnail()
-        isVideoPlaying = false
-        shrinkCard()
-        updateFocusOverlayVisibility()
-
-        // Remove and re-add the PlayerView to force a new SurfaceView to be created
-        innerLayout.removeView(playerView)
-        playerView = createPlayerView()
-        innerLayout.addView(playerView)
-
-        addPlayerViewAttachStateListener()
     }
 
     companion object {

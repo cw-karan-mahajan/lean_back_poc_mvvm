@@ -13,7 +13,8 @@ import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 @UnstableApi
 class CardLayout1(
     private val lifecycleOwner: LifecycleOwner,
-    private val exoPlayerManager: ExoPlayerManager
+    private val exoPlayerManager: ExoPlayerManager,
+    private val mainViewModel: MainViewModel
 ) : Presenter() {
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
@@ -23,6 +24,7 @@ class CardLayout1(
                 isFocusableInTouchMode = true
                 setLifecycleOwner(lifecycleOwner)
                 setExoPlayerManager(exoPlayerManager)
+                setMainViewModel(mainViewModel)
             }
         return ViewHolder(cardView)
     }

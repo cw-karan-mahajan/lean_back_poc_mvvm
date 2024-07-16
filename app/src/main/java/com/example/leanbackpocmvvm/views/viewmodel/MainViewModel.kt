@@ -9,16 +9,10 @@ import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager.Companion.TAG
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import javax.inject.Inject
 
 @UnstableApi
@@ -47,7 +41,17 @@ class MainViewModel @Inject constructor(
     private val _playVideoCommand = MutableLiveData<PlayVideoCommand>()
     val playVideoCommand: LiveData<PlayVideoCommand> = _playVideoCommand
 
-    private var itemSelectionJob: Job? = null
+    private val _autoScrollCommand = MutableLiveData<AutoScrollCommand>()
+    val autoScrollCommand: LiveData<AutoScrollCommand> = _autoScrollCommand
+
+    private val _shrinkCardCommand = MutableLiveData<String>()
+    val shrinkCardCommand: LiveData<String> = _shrinkCardCommand
+
+    private var autoScrollJob: Job? = null
+    private var currentAutoScrollRowIndex = -1
+    private var currentAutoScrollItemIndex = -1
+    private val AUTO_SCROLL_DELAY = 5000L // 5 seconds
+    private val VIDEO_START_DELAY = 5000L // 5 seconds delay before playing video
 
     data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowHeader: String) {
         val contentData: ContentData
@@ -107,7 +111,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun createCardLayout1(lifecycleOwner: LifecycleOwner): CardLayout1 {
-        return CardLayout1(lifecycleOwner, exoPlayerManager)
+        return CardLayout1(lifecycleOwner, exoPlayerManager, this)
     }
 
     fun setNetworkStatus(isConnected: Boolean) {
@@ -119,23 +123,83 @@ class MainViewModel @Inject constructor(
         _networkStatus.value = isConnected
     }
 
-    fun onItemSelected(item: CustomRowItemX) {
-        itemSelectionJob?.cancel()
-        itemSelectionJob = viewModelScope.launch {
-            delay(300) // Debounce delay
-            item.rowItemX.videoUrl?.let { videoUrl ->
-                Log.d(TAG, "MainViewModel: Selected item with video URL: $videoUrl")
-                _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+    fun onItemFocused(item: CustomRowItemX, rowIndex: Int) {
+        if (isAutoScrollableRow(rowIndex)) {
+            startAutoScroll(rowIndex)
+        } else {
+            stopAutoScroll()
+        }
+    }
 
-                _playVideoCommand.value = PlayVideoCommand(videoUrl) { cardView ->
-                    viewModelScope.launch {
-                        try {
-                            exoPlayerManager.playVideo(videoUrl, cardView)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error playing video: ${e.message}")
-                            _videoPlaybackState.value = VideoPlaybackState.Stopped
-                            _toastMessage.value = "Failed to play video. Please try again."
-                        }
+    private fun isAutoScrollableRow(rowIndex: Int): Boolean {
+        val row = _rowsAdapter.value?.get(rowIndex) as? ListRow
+        val firstItem = row?.adapter?.get(0) as? CustomRowItemX
+        return firstItem?.layout == "landscape" && firstItem?.rowHeader == "bannerAd"
+    }
+
+    private fun startAutoScroll(rowIndex: Int) {
+        if (currentAutoScrollRowIndex != rowIndex) {
+            stopAutoScroll()
+            currentAutoScrollRowIndex = rowIndex
+            currentAutoScrollItemIndex = -1
+            scrollToNextItem()
+        }
+    }
+
+    fun stopAutoScroll() {
+        autoScrollJob?.cancel()
+        currentAutoScrollRowIndex = -1
+        currentAutoScrollItemIndex = -1
+    }
+
+    private fun scrollToNextItem() {
+        if (currentAutoScrollRowIndex == -1) return
+
+        val rowAdapter = _rowsAdapter.value?.get(currentAutoScrollRowIndex) as? ListRow
+        val itemAdapter = rowAdapter?.adapter as? ArrayObjectAdapter
+        if (itemAdapter != null && itemAdapter.size() > 0) {
+            currentAutoScrollItemIndex = (currentAutoScrollItemIndex + 1) % itemAdapter.size()
+            val nextItem = itemAdapter.get(currentAutoScrollItemIndex) as? CustomRowItemX
+            if (nextItem != null) {
+                Log.d(TAG, "Emitting AutoScrollCommand: rowIndex=$currentAutoScrollRowIndex, itemIndex=$currentAutoScrollItemIndex")
+                _autoScrollCommand.value = AutoScrollCommand(currentAutoScrollRowIndex, currentAutoScrollItemIndex)
+
+                // Always show thumbnail first
+                _shrinkCardCommand.value = nextItem.rowItemX.tid
+
+                viewModelScope.launch {
+                    delay(AUTO_SCROLL_DELAY)
+                    if (nextItem.rowItemX.videoUrl != null) {
+                        playVideo(nextItem)
+                    } else {
+                        scheduleNextAutoScroll()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun scheduleNextAutoScroll() {
+        autoScrollJob?.cancel()
+        autoScrollJob = viewModelScope.launch {
+            delay(AUTO_SCROLL_DELAY)
+            scrollToNextItem()
+        }
+    }
+
+    private fun playVideo(item: CustomRowItemX) {
+        item.rowItemX.videoUrl?.let { videoUrl ->
+            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid) { cardView, tileId ->
+                viewModelScope.launch {
+                    try {
+                        cardView.setTileId(tileId)
+                        exoPlayerManager.playVideo(videoUrl, cardView, tileId)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error playing video: ${e.message}")
+                        _videoPlaybackState.value = VideoPlaybackState.Stopped
+                        _toastMessage.value = "Failed to play video. Please try again."
+                        handleVideoEnded(tileId)
                     }
                 }
             }
@@ -155,9 +219,24 @@ class MainViewModel @Inject constructor(
         // Handle search click
     }
 
+    fun onVideoEnded(tileId: String) {
+        handleVideoEnded(tileId)
+    }
+
+    private fun handleVideoEnded(tileId: String) {
+        _videoPlaybackState.value = VideoPlaybackState.Stopped
+        _shrinkCardCommand.value = tileId
+        scheduleNextAutoScroll()
+    }
+
     override fun onCleared() {
         super.onCleared()
         exoPlayerManager.releasePlayer()
+        stopAutoScroll()
+    }
+
+    companion object {
+        const val TAG = "MainViewModel"
     }
 }
 
@@ -175,8 +254,10 @@ data class ContentData(
 )
 
 @OptIn(UnstableApi::class)
-data class PlayVideoCommand
-    (
+data class PlayVideoCommand(
     val videoUrl: String,
-    val playAction: (NewVideoCardView) -> Unit
+    val tileId: String,
+    val playAction: (NewVideoCardView, String) -> Unit
 )
+
+data class AutoScrollCommand(val rowIndex: Int, val itemIndex: Int)

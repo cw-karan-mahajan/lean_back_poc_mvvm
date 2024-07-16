@@ -20,14 +20,13 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
+import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
-
 
 @UnstableApi
 @Singleton
@@ -40,6 +39,7 @@ class ExoPlayerManager @Inject constructor(
     private var isPlayingVideo = AtomicBoolean(false)
     private var hasVideoEnded = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
+    private lateinit var tileId:String
     private val simpleCache: SimpleCache by lazy {
         SimpleCache(
             File(context.cacheDir, "media"),
@@ -49,7 +49,9 @@ class ExoPlayerManager @Inject constructor(
 
     private val isReleasing = AtomicBoolean(false)
 
-    suspend fun playVideo(videoUrl: String, cardView: NewVideoCardView) {
+    suspend fun playVideo(videoUrl: String, cardView: NewVideoCardView, tileId: String) {
+        this.tileId = tileId
+        if (videoUrl.isNullOrEmpty()) return
         var retryCount = 0
         val maxRetries = 1
         withContext(Dispatchers.Main) {
@@ -90,16 +92,7 @@ class ExoPlayerManager @Inject constructor(
                             player.prepare()
 
                             Log.d(TAG, "About to call getVideoSurface")
-                            val surface = withTimeoutOrNull(15000) { // 15 second timeout
-                                suspendCancellableCoroutine<Surface?> { continuation ->
-                                    cardView.getVideoSurface { retrievedSurface ->
-                                        Log.d(TAG, "Received surface from cardView: ${retrievedSurface != null}")
-                                        if (!continuation.isCompleted) {
-                                            continuation.resume(retrievedSurface)
-                                        }
-                                    }
-                                }
-                            }
+                            val surface = cardView.getVideoSurface()
                             Log.d(TAG, "After getVideoSurface call, surface: ${surface != null}")
 
                             if (surface != null && surface.isValid) {
@@ -114,7 +107,10 @@ class ExoPlayerManager @Inject constructor(
                                 Log.d(TAG, "Video playback started successfully")
                                 return@withContext
                             } else {
-                                Log.e(TAG, "Invalid or null surface received. PlayerView state: ${cardView.getPlayerViewState()}")
+                                Log.e(
+                                    TAG,
+                                    "Invalid or null surface received. PlayerView state: ${cardView.getPlayerViewState()}"
+                                )
                                 cardView.resetPlayerView()
                                 delay(1000) // Wait a bit before retrying
                                 retryCount++
@@ -177,12 +173,15 @@ class ExoPlayerManager @Inject constructor(
                                     isPlayingVideo.set(false)
                                     currentPlayingView?.resetPlayerView()
                                     currentPlayingView?.shrinkCard()
+                                    currentPlayingView?.onVideoEnded(tileId)  // Notify video ended
                                 }
+
                                 Player.STATE_READY -> {
                                     Log.d(TAG, "Player is ready")
                                     isPlayingVideo.set(playWhenReady)
                                     currentPlayingView?.ensureVideoVisible()
                                 }
+
                                 Player.STATE_BUFFERING -> Log.d(TAG, "Player is buffering")
                                 Player.STATE_IDLE -> Log.d(TAG, "Player is idle")
                             }
@@ -209,7 +208,11 @@ class ExoPlayerManager @Inject constructor(
     private fun createMediaCodecSelector(): MediaCodecSelector {
         return MediaCodecSelector.DEFAULT.let { defaultSelector ->
             MediaCodecSelector { mimeType, requiresSecureDecoder, requiresTunnelingDecoder ->
-                val decoders = defaultSelector.getDecoderInfos(mimeType, requiresSecureDecoder, requiresTunnelingDecoder)
+                val decoders = defaultSelector.getDecoderInfos(
+                    mimeType,
+                    requiresSecureDecoder,
+                    requiresTunnelingDecoder
+                )
                 decoders.filterNot { it.name == "OMX.MS.AVC.Decoder" }
             }
         }
@@ -240,6 +243,10 @@ class ExoPlayerManager @Inject constructor(
                 isReleasing.set(false)
             }
         }
+    }
+
+    fun getPlayer(): ExoPlayer {
+        return exoPlayer!!
     }
 
     fun isVideoPlaying(): Boolean = isPlayingVideo.get()

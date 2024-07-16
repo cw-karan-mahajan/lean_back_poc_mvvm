@@ -5,25 +5,23 @@ import android.net.ConnectivityManager
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.leanback.app.BrowseSupportFragment
-import androidx.leanback.widget.ArrayObjectAdapter
-import androidx.leanback.widget.ListRow
+import androidx.leanback.widget.*
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager.Companion.TAG
 import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
 import javax.inject.Inject
 
 @UnstableApi
@@ -37,9 +35,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     @Inject
     lateinit var exoPlayerManager: ExoPlayerManager
 
-    @Inject
-    lateinit var coroutineScope: CoroutineScope
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val filter = IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
@@ -51,7 +46,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         super.onViewCreated(view, savedInstanceState)
         setupEventListeners()
         observeViewModel()
-        //viewModel.loadData(viewLifecycleOwner)
     }
 
     private fun observeViewModel() {
@@ -77,34 +71,38 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.playVideoCommand.observe(viewLifecycleOwner) { command ->
-            val cardView = view?.findViewWithTag<NewVideoCardView>(command.videoUrl)
-            cardView?.let { command.playAction(it) }
+            val cardView = view?.findViewWithTag<NewVideoCardView>(command.tileId)
+            cardView?.let { command.playAction(it, command.tileId) }
         }
-    }
 
-    private fun updateSelectedItemVideoState(state: VideoPlaybackState) {
-        val adapter = adapter as? ArrayObjectAdapter
-        adapter?.let { arrayAdapter ->
-            for (i in 0 until arrayAdapter.size()) {
-                val row = arrayAdapter.get(i) as? ListRow
-                row?.let {
-                    val rowAdapter = it.adapter as? ArrayObjectAdapter
-                    rowAdapter?.let { itemAdapter ->
-                        for (j in 0 until itemAdapter.size()) {
-                            val item = itemAdapter.get(j) as? MainViewModel.CustomRowItemX
-                            item?.let { customItem ->
-                                updateCardViewState(customItem, state)
-                            }
-                        }
-                    }
-                }
+        viewModel.autoScrollCommand.observe(viewLifecycleOwner) { command ->
+            Log.d(
+                TAG,
+                "Received AutoScrollCommand: rowIndex=${command.rowIndex}, itemIndex=${command.itemIndex}"
+            )
+            scrollToItem(command.rowIndex, command.itemIndex)
+        }
+
+        viewModel.shrinkCardCommand.observe(viewLifecycleOwner) { tileId ->
+            val cardToShrink = view?.findViewWithTag<NewVideoCardView>(tileId)
+            cardToShrink?.let {
+                it.shrinkCard()
+                it.showThumbnail()
             }
         }
     }
 
-    private fun updateCardViewState(item: MainViewModel.CustomRowItemX, state: VideoPlaybackState) {
-        val cardView = view?.findViewWithTag<NewVideoCardView>(item.rowItemX.tid)
-        cardView?.updateVideoPlaybackState(state)
+    private fun updateSelectedItemVideoState(state: VideoPlaybackState) {
+        when (state) {
+            is VideoPlaybackState.Playing -> {
+                val cardView = view?.findViewWithTag<NewVideoCardView>(state.itemId)
+                //cardView?.startVideoPlayback()
+            }
+
+            is VideoPlaybackState.Stopped -> {
+                // Handle stopped state if needed
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -121,22 +119,21 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     private fun setupEventListeners() {
         setOnItemViewSelectedListener { itemViewHolder, item, rowViewHolder, row ->
-            when {
-                item is MainViewModel.CustomRowItemX && itemViewHolder?.view is NewVideoCardView -> {
-                    val cardView = itemViewHolder.view as NewVideoCardView
-                    Log.d(TAG, "MainFragment: Item selected, calling onItemSelected")
-                    cardView.setExoPlayerManager(exoPlayerManager)
-                    viewModel.onItemSelected(item)
+            when (item) {
+                is MainViewModel.CustomRowItemX -> {
+                    val cardView = itemViewHolder?.view as? NewVideoCardView
+                    if (cardView != null) {
+                        cardView.setExoPlayerManager(exoPlayerManager)
+                        val rowIndex = mRowsAdapter.indexOf(row)
+                        viewModel.onItemFocused(item, rowIndex)
+                    }
                 }
-                itemViewHolder?.view is NewVideoCardView -> {
-                    (itemViewHolder.view as NewVideoCardView).shrinkCard()
-                }
+
                 else -> {
-                    Log.d("MainFragment", "Unhandled item type: ${item?.javaClass?.simpleName}")
+                    viewModel.stopAutoScroll()
+                    viewModel.stopVideoPlayback()
                 }
             }
-            // Stop and release player when moving to any new tile
-            viewModel.stopVideoPlayback()
         }
 
         setOnItemViewClickedListener { _, item, _, _ ->
@@ -147,6 +144,33 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         setOnSearchClickedListener {
             viewModel.onSearchClicked()
+        }
+    }
+
+    private fun scrollToItem(rowIndex: Int, itemIndex: Int) {
+        view?.post {
+            Log.d(TAG, "Scrolling to item: rowIndex=$rowIndex, itemIndex=$itemIndex")
+            val verticalGridView =
+                view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+            val rowView = verticalGridView?.getChildAt(rowIndex) as? ViewGroup
+            val horizontalGridView =
+                rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
+            horizontalGridView?.smoothScrollToPosition(itemIndex)
+
+            horizontalGridView?.post {
+                val viewHolder = horizontalGridView.findViewHolderForAdapterPosition(itemIndex)
+                val itemView = viewHolder?.itemView as? NewVideoCardView
+                itemView?.let {
+                    Log.d(
+                        TAG,
+                        "Requesting focus for item: rowIndex=$rowIndex, itemIndex=$itemIndex"
+                    )
+                    it.requestFocus()
+                } ?: Log.e(
+                    TAG,
+                    "Failed to find item view for rowIndex=$rowIndex, itemIndex=$itemIndex"
+                )
+            }
         }
     }
 
@@ -165,11 +189,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         if (isConnected) {
             offlineText.visibility = View.GONE
-            val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.wifi_connected_white_filled)
+            val drawable =
+                ContextCompat.getDrawable(requireContext(), R.drawable.wifi_connected_white_filled)
             wifiLogo.setImageDrawable(drawable)
         } else {
             offlineText.visibility = View.VISIBLE
-            val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.wifi_disconnected_white)
+            val drawable =
+                ContextCompat.getDrawable(requireContext(), R.drawable.wifi_disconnected_white)
             wifiLogo.setImageDrawable(drawable)
         }
     }
@@ -180,5 +206,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     private fun hideProgressBar() {
         requireActivity().findViewById<ProgressBar>(R.id.progress_bar).visibility = View.GONE
+    }
+
+    companion object {
+        private const val TAG = "MainFragment"
     }
 }
