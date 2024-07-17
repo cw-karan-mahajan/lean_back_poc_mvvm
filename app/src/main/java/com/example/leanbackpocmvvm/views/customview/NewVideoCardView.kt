@@ -39,6 +39,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private var videoSurface: Surface? = null
     var isVideoPlaying = false
     private val focusOverlay: View
+    private lateinit var thumbnailOverlay: FrameLayout
 
     private var originalWidth: Int = 0
     private var originalHeight: Int = 0
@@ -100,6 +101,15 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
         addView(innerLayout)
         clipChildren = false
+
+        thumbnailOverlay = FrameLayout(context).apply {
+            layoutParams = LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            visibility = View.GONE
+        }
+        addView(thumbnailOverlay)
 
         isFocusable = true
         isFocusableInTouchMode = true
@@ -217,11 +227,21 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         playerView.visibility = View.VISIBLE
         playerView.alpha = 1f
         thumbnailImageView.visibility = View.GONE
-        posterImageView.visibility = View.VISIBLE
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            //requestLayout()
-            //invalidate()
+        posterImageView.visibility = View.GONE
+
+        // Create a copy of the thumbnail image
+        val thumbnailCopy = ImageView(context).apply {
+            layoutParams = LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            setImageDrawable(thumbnailImageView.drawable)
         }
+
+        thumbnailOverlay.removeAllViews()
+        thumbnailOverlay.addView(thumbnailCopy)
+        thumbnailOverlay.visibility = View.VISIBLE
     }
 
     fun startVideoPlayback(player: ExoPlayer) {
@@ -230,7 +250,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         playerView.useController = false
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
         playerView.visibility = View.VISIBLE
-        posterImageView.visibility = View.GONE
 
         Log.d(TAG, "PlayerView dimensions: ${playerView.width}x${playerView.height}")
         Log.d(TAG, "PlayerView visibility: ${playerView.visibility == View.VISIBLE}")
@@ -239,15 +258,16 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             override fun onRenderedFirstFrame() {
                 Log.d(TAG, "First frame rendered")
                 player.removeListener(this)
-                val animation = ObjectAnimator.ofFloat(playerView, "alpha", 0f, 1f).apply {
-                    duration = 500
-                }
-                animation.start()
-                animation.doOnEnd {
-                    Log.d(TAG, "Fade-in animation completed")
-                    ensureVideoVisible()
-                    stretchCard()
-                }
+                thumbnailOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .withEndAction {
+                        thumbnailOverlay.visibility = View.GONE
+                        thumbnailOverlay.alpha = 1f
+                        ensureVideoVisible()
+                        stretchCard()
+                    }
+                    .start()
             }
         })
 
@@ -278,6 +298,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         posterImageView.layoutParams = LayoutParams(targetWidth, targetHeight)
         playerView.layoutParams = LayoutParams(targetWidth, targetHeight)
         focusOverlay.layoutParams = LayoutParams(targetWidth, targetHeight)
+        thumbnailOverlay.layoutParams = LayoutParams(targetWidth, targetHeight)
 
         updateFocusOverlayVisibility()
     }
@@ -292,11 +313,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
     fun shrinkCard() {
         lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-        Log.d(TAG, "Shrinking card")
-        resizeCard(false)
-
-            //requestLayout()
-            //invalidate()
+            Log.d(TAG, "Shrinking card")
+            resizeCard(false)
         }
     }
 
@@ -328,12 +346,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         playerView.visibility = View.GONE
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
+        thumbnailOverlay.visibility = View.GONE
     }
 
     fun ensureVideoVisible() {
         playerView.visibility = View.VISIBLE
         thumbnailImageView.visibility = View.GONE
         posterImageView.visibility = View.GONE
+        thumbnailOverlay.visibility = View.GONE
     }
 
     private fun isCardFocused(): Boolean {
@@ -354,6 +374,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         playerView.visibility = View.GONE
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
+        thumbnailOverlay.visibility = View.GONE
         shrinkCard()
         updateFocusOverlayVisibility()
     }
@@ -363,13 +384,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         playerView.visibility = View.GONE
         showThumbnail()
         isVideoPlaying = false
-    }
-
-    fun getPlayerViewState(): String {
-        return "Width: ${playerView.width}, Height: ${playerView.height}, " +
-                "Visibility: ${playerView.visibility == View.VISIBLE}, " +
-                "Is laid out: ${playerView.isLaidOut}, " +
-                "Has surface: ${playerView.videoSurfaceView != null}"
     }
 
     companion object {
