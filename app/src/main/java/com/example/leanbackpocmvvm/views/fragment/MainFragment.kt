@@ -86,11 +86,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.shrinkCardCommand.observe(viewLifecycleOwner) { tileId ->
-            val cardToShrink = view?.findViewWithTag<NewVideoCardView>(tileId)
-            cardToShrink?.let {
-                it.shrinkCard()
-                it.showThumbnail()
-            }
+                val cardToUpdate = view?.findViewWithTag<NewVideoCardView>(tileId)
+                cardToUpdate?.showThumbnail()
+                cardToUpdate?.shrinkCard()
+        }
+
+        viewModel.resetCardCommand.observe(viewLifecycleOwner) { tileId ->
+            val cardToReset = view?.findViewWithTag<NewVideoCardView>(tileId)
+            cardToReset?.resetCardState()
         }
     }
 
@@ -231,6 +234,11 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     private fun hideProgressBar() {
         requireActivity().findViewById<ProgressBar>(R.id.progress_bar).visibility = View.GONE
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        exoPlayerManager.releasePlayer()
     }
 
     companion object {

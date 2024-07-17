@@ -47,11 +47,14 @@ class MainViewModel @Inject constructor(
     private val _shrinkCardCommand = MutableLiveData<String>()
     val shrinkCardCommand: LiveData<String> = _shrinkCardCommand
 
-    private val _stretchCardCommand = MutableLiveData<String>()
-    val stretchCardCommand: LiveData<String> = _stretchCardCommand
+//    private val _stretchCardCommand = MutableLiveData<String>()
+//    val stretchCardCommand: LiveData<String> = _stretchCardCommand
+//
+//    private val _showThumbnailCommand = MutableLiveData<String>()
+//    val showThumbnailCommand: LiveData<String> = _showThumbnailCommand
 
-    private val _showThumbnailCommand = MutableLiveData<String>()
-    val showThumbnailCommand: LiveData<String> = _showThumbnailCommand
+    private val _resetCardCommand = MutableLiveData<String>()
+    val resetCardCommand: LiveData<String> = _resetCardCommand
 
     private var autoScrollJob: Job? = null
     private var playbackJob: Job? = null
@@ -140,7 +143,7 @@ class MainViewModel @Inject constructor(
 
         if (isCurrentRowAutoScrollable) {
             startAutoScroll(rowIndex, itemIndex)
-        } else if (item.rowItemX.videoUrl != null && item.rowItemX.tid != lastPlayedNonScrollableTileId) {
+        } else if (item.rowItemX.videoUrl != null) {
             scheduleVideoPlay(item, rowIndex, itemIndex)
         }
 
@@ -212,11 +215,8 @@ class MainViewModel @Inject constructor(
     private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
         item.rowItemX.videoUrl?.let { videoUrl ->
             _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
-            _stretchCardCommand.value = item.rowItemX.tid
+            //_stretchCardCommand.value = item.rowItemX.tid
             currentlyPlayingVideoTileId = item.rowItemX.tid
-            if (!isCurrentRowAutoScrollable) {
-                lastPlayedNonScrollableTileId = item.rowItemX.tid
-            }
             _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid) { cardView, tileId ->
                 viewModelScope.launch {
                     try {
@@ -270,15 +270,14 @@ class MainViewModel @Inject constructor(
         currentlyPlayingVideoTileId?.let { tileId ->
             exoPlayerManager.releasePlayer()
             _videoPlaybackState.value = VideoPlaybackState.Stopped
-            _shrinkCardCommand.value = tileId
-            showOriginalThumbnail(tileId)
+            _resetCardCommand.value = tileId
             isVideoPlaying = false
             currentlyPlayingVideoTileId = null
         }
     }
 
     private fun showOriginalThumbnail(tileId: String) {
-        _showThumbnailCommand.value = tileId
+        //_showThumbnailCommand.value = tileId
     }
 
     private fun cancelPendingPlayback() {
@@ -304,6 +303,7 @@ class MainViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
+        viewModelScope.cancel()
         cancelPendingPlayback()
         exoPlayerManager.releasePlayer()
         stopAutoScroll()
