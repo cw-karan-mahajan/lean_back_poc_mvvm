@@ -7,6 +7,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
+import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 
@@ -31,7 +32,7 @@ class CardLayout1(
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
         val cardView = viewHolder.view as NewVideoCardView
-        val customItem = item as? MainViewModel.CustomRowItemX
+        val customItem = item as? CustomRowItemX
         if (customItem != null) {
             cardView.setImage(
                 customItem.contentData.imageUrl,

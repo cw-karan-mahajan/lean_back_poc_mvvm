@@ -12,9 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -201,8 +199,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         Log.d(TAG, "Preparing for video playback")
         playerView.visibility = View.VISIBLE
         playerView.alpha = 1f // Make it fully visible
-        requestLayout()
-        invalidate()
+        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            requestLayout()
+            invalidate()
+        }
     }
 
     fun startVideoPlayback(player: ExoPlayer) {
@@ -273,8 +273,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     fun shrinkCard() {
         Log.d(TAG, "Shrinking card")
         resizeCard(false)
-        requestLayout()
-        invalidate()
+        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+            requestLayout()
+            invalidate()
+        }
     }
 
     private fun updateVideoSurface() {

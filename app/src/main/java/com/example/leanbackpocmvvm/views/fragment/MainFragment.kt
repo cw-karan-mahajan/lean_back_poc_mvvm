@@ -19,6 +19,7 @@ import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
+import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,7 +45,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        setupEventListeners()
+
         observeViewModel()
     }
 
@@ -52,6 +53,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.rowsAdapter.observe(viewLifecycleOwner) { rowsAdapter ->
             mRowsAdapter = rowsAdapter
             adapter = mRowsAdapter
+            setupEventListeners()
         }
 
         viewModel.isLoading.observe(viewLifecycleOwner) { isLoading ->
@@ -120,12 +122,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun setupEventListeners() {
         setOnItemViewSelectedListener { itemViewHolder, item, rowViewHolder, row ->
             when (item) {
-                is MainViewModel.CustomRowItemX -> {
+                is CustomRowItemX -> {
                     val cardView = itemViewHolder?.view as? NewVideoCardView
                     if (cardView != null) {
                         cardView.setExoPlayerManager(exoPlayerManager)
                         val rowIndex = mRowsAdapter.indexOf(row)
-                        viewModel.onItemFocused(item, rowIndex)
+                        val itemIndex = findItemIndex(row as? ListRow, item)
+                        //viewModel.isCurrentRowAutoScrollable = viewModel.isAutoScrollableRow(rowIndex)
+                        viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }
 
@@ -137,7 +141,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         setOnItemViewClickedListener { _, item, _, _ ->
-            if (item is MainViewModel.CustomRowItemX) {
+            if (item is CustomRowItemX) {
                 viewModel.onItemClicked(item)
             }
         }
@@ -147,31 +151,53 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
     }
 
+    private fun findItemIndex(listRow: ListRow?, item: CustomRowItemX): Int {
+        if (listRow == null) return -1
+        val adapter = listRow.adapter as? ArrayObjectAdapter ?: return -1
+        for (i in 0 until adapter.size()) {
+            if (adapter.get(i) == item) {
+                return i
+            }
+        }
+        return -1
+    }
+
     private fun scrollToItem(rowIndex: Int, itemIndex: Int) {
         view?.post {
             Log.d(TAG, "Scrolling to item: rowIndex=$rowIndex, itemIndex=$itemIndex")
-            val verticalGridView =
-                view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
-            val rowView = verticalGridView?.getChildAt(rowIndex) as? ViewGroup
-            val horizontalGridView =
-                rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
-            horizontalGridView?.smoothScrollToPosition(itemIndex)
+            val verticalGridView = view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+            verticalGridView?.smoothScrollToPosition(rowIndex)
 
-            horizontalGridView?.post {
-                val viewHolder = horizontalGridView.findViewHolderForAdapterPosition(itemIndex)
-                val itemView = viewHolder?.itemView as? NewVideoCardView
-                itemView?.let {
-                    Log.d(
-                        TAG,
-                        "Requesting focus for item: rowIndex=$rowIndex, itemIndex=$itemIndex"
-                    )
-                    it.requestFocus()
-                } ?: Log.e(
-                    TAG,
-                    "Failed to find item view for rowIndex=$rowIndex, itemIndex=$itemIndex"
-                )
+            verticalGridView?.postDelayed({
+                val rowView = findRowView(verticalGridView, rowIndex)
+                val horizontalGridView = rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
+                horizontalGridView?.smoothScrollToPosition(itemIndex)
+
+                horizontalGridView?.postDelayed({
+                    focusOnItem(horizontalGridView, itemIndex)
+                }, 200) // Delay to ensure horizontal scroll has completed
+            }, 200) // Delay to ensure vertical scroll has completed
+        }
+    }
+
+    private fun findRowView(verticalGridView: VerticalGridView?, rowIndex: Int): ViewGroup? {
+        if (verticalGridView == null) return null
+        for (i in 0 until verticalGridView.childCount) {
+            val child = verticalGridView.getChildAt(i)
+            if (verticalGridView.getChildAdapterPosition(child) == rowIndex) {
+                return child as? ViewGroup
             }
         }
+        return null
+    }
+
+    private fun focusOnItem(horizontalGridView: HorizontalGridView?, itemIndex: Int) {
+        val viewHolder = horizontalGridView?.findViewHolderForAdapterPosition(itemIndex)
+        val itemView = viewHolder?.itemView as? NewVideoCardView
+        itemView?.let {
+            Log.d(TAG, "Requesting focus for item at index $itemIndex")
+            it.requestFocus()
+        } ?: Log.e(TAG, "Failed to find item view at index $itemIndex")
     }
 
     override fun connected() {
