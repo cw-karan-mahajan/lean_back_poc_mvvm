@@ -128,7 +128,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                         cardView.setExoPlayerManager(exoPlayerManager)
                         val rowIndex = mRowsAdapter.indexOf(row)
                         val itemIndex = findItemIndex(row as? ListRow, item)
-                        //viewModel.isCurrentRowAutoScrollable = viewModel.isAutoScrollableRow(rowIndex)
                         viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }

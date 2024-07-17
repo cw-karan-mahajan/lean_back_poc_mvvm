@@ -68,6 +68,7 @@ class MainViewModel @Inject constructor(
 
     private val AUTO_SCROLL_DELAY = 5000L // 5 seconds
     private val VIDEO_START_DELAY = 5000L // 5 seconds delay before playing video
+    private var currentlyPlayingVideoTileId: String? = null
 
     fun loadData(lifecycleOwner: LifecycleOwner) {
         coroutineScope.launch(Dispatchers.IO) {
@@ -212,23 +213,22 @@ class MainViewModel @Inject constructor(
         item.rowItemX.videoUrl?.let { videoUrl ->
             _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
             _stretchCardCommand.value = item.rowItemX.tid
-            currentPlayingTileId = item.rowItemX.tid
+            currentlyPlayingVideoTileId = item.rowItemX.tid
             if (!isCurrentRowAutoScrollable) {
                 lastPlayedNonScrollableTileId = item.rowItemX.tid
             }
-            _playVideoCommand.value =
-                PlayVideoCommand(videoUrl, item.rowItemX.tid) { cardView, tileId ->
-                    viewModelScope.launch {
-                        try {
-                            cardView.setTileId(tileId)
-                            isVideoPlaying = true
-                            exoPlayerManager.playVideo(videoUrl, cardView, tileId)
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error playing video: ${e.message}")
-                            handleVideoEnded(tileId)
-                        }
+            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid) { cardView, tileId ->
+                viewModelScope.launch {
+                    try {
+                        cardView.setTileId(tileId)
+                        isVideoPlaying = true
+                        exoPlayerManager.playVideo(videoUrl, cardView, tileId)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error playing video: ${e.message}")
+                        handleVideoEnded(tileId)
                     }
                 }
+            }
         }
     }
 
@@ -254,7 +254,7 @@ class MainViewModel @Inject constructor(
         _shrinkCardCommand.value = tileId
         showOriginalThumbnail(tileId)
         isVideoPlaying = false
-        currentPlayingTileId = null
+        currentlyPlayingVideoTileId = null
 
         if (isCurrentRowAutoScrollable) {
             // For auto-scrollable rows, wait 5 seconds before moving to the next item
@@ -267,13 +267,13 @@ class MainViewModel @Inject constructor(
     }
 
     private fun stopAndShrinkPreviousItem() {
-        if (currentPlayingTileId != null) {
+        currentlyPlayingVideoTileId?.let { tileId ->
             exoPlayerManager.releasePlayer()
             _videoPlaybackState.value = VideoPlaybackState.Stopped
-            _shrinkCardCommand.value = currentPlayingTileId!!
+            _shrinkCardCommand.value = tileId
+            showOriginalThumbnail(tileId)
             isVideoPlaying = false
-            showOriginalThumbnail(currentPlayingTileId!!)
-            currentPlayingTileId = null
+            currentlyPlayingVideoTileId = null
         }
     }
 
