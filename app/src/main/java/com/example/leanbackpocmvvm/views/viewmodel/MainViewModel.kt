@@ -47,18 +47,13 @@ class MainViewModel @Inject constructor(
     private val _shrinkCardCommand = MutableLiveData<String>()
     val shrinkCardCommand: LiveData<String> = _shrinkCardCommand
 
-//    private val _stretchCardCommand = MutableLiveData<String>()
-//    val stretchCardCommand: LiveData<String> = _stretchCardCommand
-//
-//    private val _showThumbnailCommand = MutableLiveData<String>()
-//    val showThumbnailCommand: LiveData<String> = _showThumbnailCommand
-
     private val _resetCardCommand = MutableLiveData<String>()
     val resetCardCommand: LiveData<String> = _resetCardCommand
 
     private var autoScrollJob: Job? = null
     private var playbackJob: Job? = null
     private var delayJob: Job? = null
+    private var userInteractionJob: Job? = null
     private var currentAutoScrollRowIndex = -1
     private var currentAutoScrollItemIndex = -1
     private var currentPlayingRowIndex: Int = -1
@@ -68,10 +63,12 @@ class MainViewModel @Inject constructor(
     private var pendingVideoPlay: CustomRowItemX? = null
     private var currentPlayingTileId: String? = null
     private var lastPlayedNonScrollableTileId: String? = null
+    private var currentlyPlayingVideoTileId: String? = null
+    private var lastInteractionTime = 0L
 
     private val AUTO_SCROLL_DELAY = 5000L // 5 seconds
     private val VIDEO_START_DELAY = 5000L // 5 seconds delay before playing video
-    private var currentlyPlayingVideoTileId: String? = null
+    private val USER_IDLE_DELAY = 5000L // 5 seconds
 
     fun loadData(lifecycleOwner: LifecycleOwner) {
         coroutineScope.launch(Dispatchers.IO) {
@@ -133,16 +130,22 @@ class MainViewModel @Inject constructor(
     }
 
     fun onItemFocused(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
+        lastInteractionTime = System.currentTimeMillis()
+
         if (rowIndex != currentPlayingRowIndex || itemIndex != currentPlayingItemIndex) {
             stopAndShrinkPreviousItem()
             cancelPendingPlayback()
-            stopAutoScroll()
+            pauseAutoScroll()
         }
 
         isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
 
         if (isCurrentRowAutoScrollable) {
-            startAutoScroll(rowIndex, itemIndex)
+            if (item.rowItemX.videoUrl != null) {
+                scheduleVideoPlay(item, rowIndex, itemIndex)
+            } else {
+                scheduleAutoScrollResume(rowIndex, itemIndex)
+            }
         } else if (item.rowItemX.videoUrl != null) {
             scheduleVideoPlay(item, rowIndex, itemIndex)
         }
@@ -157,10 +160,24 @@ class MainViewModel @Inject constructor(
         return firstItem?.layout == "landscape" && firstItem.rowHeader == "bannerAd"
     }
 
+    private fun pauseAutoScroll() {
+        autoScrollJob?.cancel()
+        delayJob?.cancel()
+    }
+
+    private fun scheduleAutoScrollResume(rowIndex: Int, itemIndex: Int) {
+        userInteractionJob?.cancel()
+        userInteractionJob = viewModelScope.launch {
+            delay(USER_IDLE_DELAY)
+            if (System.currentTimeMillis() - lastInteractionTime >= USER_IDLE_DELAY) {
+                startAutoScroll(rowIndex, itemIndex)
+            }
+        }
+    }
+
     private fun startAutoScroll(rowIndex: Int, itemIndex: Int) {
-        stopAutoScroll()
         currentAutoScrollRowIndex = rowIndex
-        currentAutoScrollItemIndex = itemIndex - 1 // Start from the previous item
+        currentAutoScrollItemIndex = itemIndex
         scheduleNextAutoScrollItem()
     }
 
@@ -175,25 +192,21 @@ class MainViewModel @Inject constructor(
                 currentAutoScrollItemIndex = (currentAutoScrollItemIndex + 1) % itemAdapter.size()
                 val nextItem = itemAdapter.get(currentAutoScrollItemIndex) as? CustomRowItemX
                 if (nextItem != null) {
-                    Log.d(
-                        TAG,
-                        "Auto-scrolling to: rowIndex=$currentAutoScrollRowIndex, itemIndex=$currentAutoScrollItemIndex"
-                    )
-                    _autoScrollCommand.value =
-                        AutoScrollCommand(currentAutoScrollRowIndex, currentAutoScrollItemIndex)
+                    Log.d(TAG, "Auto-scrolling to: rowIndex=$currentAutoScrollRowIndex, itemIndex=$currentAutoScrollItemIndex")
+                    _autoScrollCommand.value = AutoScrollCommand(currentAutoScrollRowIndex, currentAutoScrollItemIndex)
                     _shrinkCardCommand.value = nextItem.rowItemX.tid
 
                     if (nextItem.rowItemX.videoUrl != null) {
-                        scheduleVideoPlay(
-                            nextItem,
-                            currentAutoScrollRowIndex,
-                            currentAutoScrollItemIndex
-                        )
+                        scheduleVideoPlay(nextItem, currentAutoScrollRowIndex, currentAutoScrollItemIndex)
                     } else {
                         // For non-video tiles, wait 5 seconds before moving to the next item
                         delayJob = launch {
                             delay(AUTO_SCROLL_DELAY)
-                            scheduleNextAutoScrollItem()
+                            if (System.currentTimeMillis() - lastInteractionTime >= USER_IDLE_DELAY) {
+                                scheduleNextAutoScrollItem()
+                            } else {
+                                scheduleAutoScrollResume(currentAutoScrollRowIndex, currentAutoScrollItemIndex)
+                            }
                         }
                     }
                 }
@@ -215,7 +228,6 @@ class MainViewModel @Inject constructor(
     private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
         item.rowItemX.videoUrl?.let { videoUrl ->
             _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
-            //_stretchCardCommand.value = item.rowItemX.tid
             currentlyPlayingVideoTileId = item.rowItemX.tid
             _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid) { cardView, tileId ->
                 viewModelScope.launch {
@@ -223,6 +235,8 @@ class MainViewModel @Inject constructor(
                         cardView.setTileId(tileId)
                         isVideoPlaying = true
                         exoPlayerManager.playVideo(videoUrl, cardView, tileId)
+                        // Pause auto-scroll while video is playing
+                        pauseAutoScroll()
                     } catch (e: Exception) {
                         Log.e(TAG, "Error playing video: ${e.message}")
                         handleVideoEnded(tileId)
@@ -252,15 +266,14 @@ class MainViewModel @Inject constructor(
     private fun handleVideoEnded(tileId: String) {
         _videoPlaybackState.value = VideoPlaybackState.Stopped
         _shrinkCardCommand.value = tileId
-        showOriginalThumbnail(tileId)
         isVideoPlaying = false
         currentlyPlayingVideoTileId = null
 
         if (isCurrentRowAutoScrollable) {
-            // For auto-scrollable rows, wait 5 seconds before moving to the next item
+            // For auto-scrollable rows, wait 5 seconds before resuming auto-scroll
             delayJob = viewModelScope.launch {
                 delay(AUTO_SCROLL_DELAY)
-                scheduleNextAutoScrollItem()
+                scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
             }
         }
         // For non-scrollable rows, do nothing after video ends
@@ -276,10 +289,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun showOriginalThumbnail(tileId: String) {
-        //_showThumbnailCommand.value = tileId
-    }
-
     private fun cancelPendingPlayback() {
         playbackJob?.cancel()
         playbackJob = null
@@ -289,16 +298,12 @@ class MainViewModel @Inject constructor(
     fun stopAutoScroll() {
         autoScrollJob?.cancel()
         delayJob?.cancel()
+        userInteractionJob?.cancel()
         autoScrollJob = null
         delayJob = null
+        userInteractionJob = null
         currentAutoScrollRowIndex = -1
         currentAutoScrollItemIndex = -1
-    }
-
-    private fun getCurrentItem(): CustomRowItemX? {
-        return (_rowsAdapter.value?.get(currentPlayingRowIndex) as? ListRow)?.adapter?.get(
-            currentPlayingItemIndex
-        ) as? CustomRowItemX
     }
 
     override fun onCleared() {
