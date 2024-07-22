@@ -61,8 +61,6 @@ class MainViewModel @Inject constructor(
     private var isCurrentRowAutoScrollable: Boolean = false
     private var isVideoPlaying = false
     private var pendingVideoPlay: CustomRowItemX? = null
-    private var currentPlayingTileId: String? = null
-    private var lastPlayedNonScrollableTileId: String? = null
     private var currentlyPlayingVideoTileId: String? = null
     private var lastInteractionTime = 0L
 

@@ -6,6 +6,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.views.fragment.MainFragment
 import com.example.leanbackpocmvvm.R
+import com.example.leanbackpocmvvm.views.fragment.VideoTileFragment
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
@@ -17,7 +18,7 @@ class MainActivity : FragmentActivity() {
         setContentView(R.layout.activity_main)
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
-                .replace(R.id.fragment_container, MainFragment())
+                .replace(R.id.fragment_container, VideoTileFragment())
                 .commit()
         }
     }
