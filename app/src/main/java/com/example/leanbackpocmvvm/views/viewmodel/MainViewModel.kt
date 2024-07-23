@@ -9,6 +9,7 @@ import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
+import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import dagger.hilt.android.lifecycle.HiltViewModel

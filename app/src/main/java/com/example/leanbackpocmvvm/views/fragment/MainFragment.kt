@@ -114,7 +114,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         super.onDestroy()
         requireActivity().unregisterReceiver(networkChangeReceiver)
         viewModel.stopVideoPlayback()
-        exoPlayerManager.releasePlayer()
+        exoPlayerManager.onLifecycleDestroy()
     }
 
     private fun setUI() {
@@ -143,14 +143,16 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         setOnItemViewClickedListener { _, item, _, _ ->
-            if (item is CustomRowItemX) {
-                viewModel.onItemClicked(item)
+            when (item) {
+                is CustomRowItemX -> {
+                    viewModel.onItemClicked(item)
+                }
             }
         }
-
         setOnSearchClickedListener {
             viewModel.onSearchClicked()
         }
+        // Add scroll listener to the main RecyclerView
     }
 
     private fun findItemIndex(listRow: ListRow?, item: CustomRowItemX): Int {

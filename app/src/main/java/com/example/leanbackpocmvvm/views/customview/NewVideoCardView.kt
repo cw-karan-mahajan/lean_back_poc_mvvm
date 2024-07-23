@@ -1,6 +1,5 @@
 package com.example.leanbackpocmvvm.views.customview
 
-import android.animation.ObjectAnimator
 import android.content.Context
 import android.util.Log
 import android.view.Surface
@@ -10,7 +9,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
-import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -20,13 +18,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
+import com.bumptech.glide.request.RequestOptions
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.example.leanbackpocmvvm.utils.dpToPx
+import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
-import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -177,37 +178,32 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun loadImage(imageUrl: String, width: Int, height: Int, imageView: ImageView) {
-        Glide.with(context)
-            .load(imageUrl)
-            .transition(DrawableTransitionOptions.withCrossFade())
+        val requestOptions = RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .centerCrop()
             .override(width, height)
+            .downsample(DownsampleStrategy.CENTER_INSIDE)
+        if (isAndroidVersion9Supported()) {
+            requestOptions.format(DecodeFormat.PREFER_RGB_565) // Uses less memory
+        }
+
+        Glide.with(context)
+            .load(imageUrl)
+            .apply(requestOptions)
+            .transition(DrawableTransitionOptions.withCrossFade())
             .into(imageView)
+
+//        Glide.with(context)
+//            .load(imageUrl)
+//            .transition(DrawableTransitionOptions.withCrossFade())
+//            .diskCacheStrategy(DiskCacheStrategy.ALL)
+//            .centerCrop()
+//            .override(width, height)
+//            .into(imageView)
     }
 
     fun setExoPlayerManager(manager: ExoPlayerManager) {
         this.exoPlayerManager = manager
-    }
-
-    fun updateVideoPlaybackState(state: VideoPlaybackState) {
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            when (state) {
-                is VideoPlaybackState.Playing -> {
-                    if (state.itemId == tag) {
-                        exoPlayerManager?.playVideo(state.videoUrl, this@NewVideoCardView, tileId)
-                    } else {
-                        stopVideoPlayback()
-                        showThumbnail()
-                    }
-                }
-
-                is VideoPlaybackState.Stopped -> {
-                    stopVideoPlayback()
-                    showThumbnail()
-                }
-            }
-        }
     }
 
     fun setMainImageDimensions(isReqStretched: Boolean, isPortrait: Boolean, w: Int, h: Int) {

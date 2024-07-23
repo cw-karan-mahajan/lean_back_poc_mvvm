@@ -1,6 +1,7 @@
 package com.example.leanbackpocmvvm.utils
 
 import android.content.Context
+import android.media.MediaCodec
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -19,14 +20,15 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
+import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
-import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import java.io.File
 import java.lang.ref.WeakReference
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -37,27 +39,34 @@ class ExoPlayerManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val coroutineScope: CoroutineScope
 ) {
-    private var exoPlayer: ExoPlayer? = null
     private var currentPlayingView: WeakReference<NewVideoCardView>? = null
     private var isPlayingVideo = AtomicBoolean(false)
     private var hasVideoEnded = AtomicBoolean(false)
     private lateinit var tileId: String
     private var currentVideoUrl = ""
     private val simpleCache: SimpleCache by lazy {
+        val cacheSize = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.P) {
+            50 * 1024 * 1024 // 50 MB for Android 9
+        } else {
+            100 * 1024 * 1024 // 100 MB for other versions
+        }
         SimpleCache(
             File(context.cacheDir, "media"),
-            LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024) // 100 MB cache
+            LeastRecentlyUsedCacheEvictor(cacheSize.toLong())
         )
     }
 
     private val isReleasing = AtomicBoolean(false)
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    private val playerPool = ObjectPool(
+        factory = { createExoPlayer() },
+        reset = { it.stop() },
+        validate = { it.playbackState != Player.STATE_IDLE }
+    )
+
     private fun getOrCreatePlayer(): ExoPlayer {
-        if (exoPlayer == null) {
-            exoPlayer = createExoPlayer()
-        }
-        return exoPlayer!!
+        return playerPool.acquire()
     }
 
     suspend fun playVideo(videoUrl: String, cardView: NewVideoCardView, tileId: String) {
@@ -116,11 +125,13 @@ class ExoPlayerManager @Inject constructor(
                 .setRenderersFactory(
                     DefaultRenderersFactory(context).setExtensionRendererMode(
                         DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                    )
+                    ).setMediaCodecSelector(createMediaCodecSelector())
                 )
+                .setLoadControl(createLoadControl())
                 .build().apply {
                     addListener(playerListener)
                 }
+
         } else {
             val renderersFactory = DefaultRenderersFactory(context).apply {
                 setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -134,24 +145,7 @@ class ExoPlayerManager @Inject constructor(
                     videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                     repeatMode = Player.REPEAT_MODE_OFF
 
-                    addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(state: Int) {
-                            playerScope.launch {
-                                when (state) {
-                                    Player.STATE_ENDED -> handleVideoEnded()
-                                    Player.STATE_READY -> handlePlayerReady()
-                                    Player.STATE_BUFFERING -> Log.d(TAG, "Player is buffering")
-                                    Player.STATE_IDLE -> Log.d(TAG, "Player is idle")
-                                }
-                            }
-                        }
-
-                        override fun onPlayerError(error: PlaybackException) {
-                            playerScope.launch {
-                                handlePlayerError(error)
-                            }
-                        }
-                    })
+                    addListener(playerListener)
                 }
         }
 
@@ -166,74 +160,88 @@ class ExoPlayerManager @Inject constructor(
                     requiresSecureDecoder,
                     requiresTunnelingDecoder
                 )
-                decoders.filterNot { it.name == "OMX.MS.AVC.Decoder" }
+                if (isAndroidVersion9Supported()) {
+                    decoders.sortedWith(compareByDescending {
+                        it.name.lowercase().contains("qcom") ||
+                                it.name.lowercase().contains("mali") ||
+                                it.name.lowercase().contains("arm")
+                    })
+                } else {
+                    decoders.filterNot { it.name == "OMX.MS.AVC.Decoder" }
+                }
             }
         }
     }
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            Log.e(TAG, "Player error: ${error.message}", error)
-            currentPlayingView?.get()?.showThumbnail()
-            // Attempt to recover from the error
-            exoPlayer?.let { player ->
-                when (error.errorCode) {
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
-                        // Retry network errors
-                        player.prepare()
-                    }
+            playerScope.launch {
+                Log.e(TAG, "Player error: ${error.message}", error)
+                currentPlayingView?.get()?.showThumbnail()
+                // Attempt to recover from the error
+                getOrCreatePlayer().let { player ->
+                    when (error.errorCode) {
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
+                            // Retry network errors
+                            player.prepare()
+                        }
 
-                    PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
-                        // Retry playback for live streams
-                        player.seekToDefaultPosition()
-                        player.prepare()
-                    }
+                        PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
+                            // Retry playback for live streams
+                            player.seekToDefaultPosition()
+                            player.prepare()
+                        }
 
-                    else -> {
-                        // For other errors, reset the player
-                        player.stop()
-                        player.clearMediaItems()
-                        player.setMediaItem(MediaItem.fromUri(currentVideoUrl ?: ""))
-                        player.prepare()
+                        else -> {
+                            // For other errors, reset the player
+                            player.stop()
+                            player.clearMediaItems()
+                            player.setMediaItem(MediaItem.fromUri(currentVideoUrl ?: ""))
+                            player.prepare()
+                        }
                     }
                 }
             }
         }
 
         override fun onPlaybackStateChanged(state: Int) {
-            when (state) {
-                Player.STATE_IDLE -> Log.d(TAG, "Player is idle")
-                Player.STATE_BUFFERING -> Log.d(TAG, "Player is buffering")
-                Player.STATE_READY -> {
-                    Log.d(TAG, "Player is ready")
-                    currentPlayingView?.get()?.ensureVideoVisible()
-                }
+            playerScope.launch {
+                when (state) {
+                    Player.STATE_IDLE -> Log.d(TAG, "Player is idle")
+                    Player.STATE_BUFFERING -> Log.d(TAG, "Player is buffering")
+                    Player.STATE_READY -> {
+                        Log.d(TAG, "Player is ready")
+                        currentPlayingView?.get()?.ensureVideoVisible()
+                    }
 
-                Player.STATE_ENDED -> {
-                    Log.d(TAG, "Player has ended")
-                    handleVideoEnded()
-                    //currentPlayingView?.get()?.showThumbnail()
-                    //currentPlayingView?.get()?.shrinkCard()
+                    Player.STATE_ENDED -> {
+                        Log.d(TAG, "Player has ended")
+                        handleVideoEnded()
+                    }
                 }
             }
         }
     }
 
     private fun createLoadControl(): LoadControl {
-        return DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
+        val builder = DefaultLoadControl.Builder()
+        if (isAndroidVersion9Supported()) {
+            builder.setBufferDurationsMs(
+                DefaultLoadControl.DEFAULT_MIN_BUFFER_MS / 2,
+                DefaultLoadControl.DEFAULT_MAX_BUFFER_MS / 2,
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS / 2,
+                DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS / 2
+            )
+        } else {
+            builder.setBufferDurationsMs(
                 DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
                 DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
                 DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS / 10,
                 DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS / 10
             )
-            .build()
-    }
-
-
-    private fun isAndroidVersion9Supported(): Boolean {
-        return Build.VERSION.SDK_INT == Build.VERSION_CODES.P
+        }
+        return builder.build()
     }
 
     private fun handleVideoEnded() {
@@ -243,29 +251,14 @@ class ExoPlayerManager @Inject constructor(
             view.resetPlayerView()
             view.shrinkCard()
             if (!isAndroidVersion9Supported()) {
-                // below auto scroll code creating issue while playing videos in version 9
                 view.onVideoEnded(tileId)
             }
         }
     }
 
-    private fun handlePlayerReady() {
-        isPlayingVideo.set(exoPlayer?.playWhenReady == true)
-        currentPlayingView?.get()?.ensureVideoVisible()
-    }
-
-    private fun handlePlayerError(error: PlaybackException) {
-        Log.e(TAG, "ExoPlayer error: ${error.message}")
-        currentPlayingView?.get()?.let { view ->
-            view.showThumbnail()
-            view.shrinkCard()
-        }
-        releasePlayer()
-    }
-
     fun setVideoSurface(surface: Surface) {
         playerScope.launch {
-            exoPlayer?.setVideoSurface(surface)
+            getOrCreatePlayer().setVideoSurface(surface)
         }
     }
 
@@ -280,8 +273,10 @@ class ExoPlayerManager @Inject constructor(
                 currentPlayingView?.get()?.showThumbnail()
                 currentPlayingView?.get()?.shrinkCard()
                 currentPlayingView?.clear()
-                exoPlayer?.release()
-                exoPlayer = null
+                getOrCreatePlayer().let { player ->
+                    player.stop()
+                    playerPool.release(player)
+                }
                 isPlayingVideo.set(false)
                 hasVideoEnded.set(false)
             } finally {
@@ -289,10 +284,9 @@ class ExoPlayerManager @Inject constructor(
             }
         }
 
-        System.gc()
+        if (isAndroidVersion9Supported())
+            System.gc()
     }
-
-    fun isVideoPlaying(): Boolean = isPlayingVideo.get()
 
     fun onLifecycleDestroy() {
         releasePlayer()
@@ -301,5 +295,28 @@ class ExoPlayerManager @Inject constructor(
 
     companion object {
         const val TAG = "ExoPlayerManager"
+    }
+}
+
+class ObjectPool<T>(
+    private val factory: () -> T,
+    private val reset: (T) -> Unit,
+    private val validate: (T) -> Boolean
+) {
+    private val pool = ConcurrentLinkedQueue<T>()
+
+    fun acquire(): T {
+        var obj = pool.poll()
+        if (obj == null || !validate(obj)) {
+            obj = factory()
+        } else {
+            reset(obj)
+        }
+        return obj
+    }
+
+    fun release(obj: T) {
+        reset(obj)
+        pool.offer(obj)
     }
 }
