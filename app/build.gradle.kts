@@ -47,7 +47,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     //implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.leanback)
-    implementation(libs.glide)
+    //implementation(libs.glide)
+    implementation("com.github.bumptech.glide:glide:4.13.0")
+    //annotationProcessor("com.github.bumptech.glide:compiler:4.13.0")
+    kapt("com.github.bumptech.glide:compiler:4.13.0")
 
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.3")

@@ -1,10 +1,7 @@
 package com.example.leanbackpocmvvm.utils
 
 import android.content.Context
-import android.media.MediaCodec
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import androidx.media3.common.MediaItem
@@ -20,7 +17,6 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
-import androidx.media3.exoplayer.mediacodec.MediaCodecInfo
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
@@ -64,6 +60,8 @@ class ExoPlayerManager @Inject constructor(
         reset = { it.stop() },
         validate = { it.playbackState != Player.STATE_IDLE }
     )
+
+    private val releasePlayerDebouncer = Debouncer<Unit>(300L) // 300ms debounce
 
     private fun getOrCreatePlayer(): ExoPlayer {
         return playerPool.acquire()
@@ -131,7 +129,6 @@ class ExoPlayerManager @Inject constructor(
                 .build().apply {
                     addListener(playerListener)
                 }
-
         } else {
             val renderersFactory = DefaultRenderersFactory(context).apply {
                 setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -144,7 +141,6 @@ class ExoPlayerManager @Inject constructor(
                 .apply {
                     videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                     repeatMode = Player.REPEAT_MODE_OFF
-
                     addListener(playerListener)
                 }
         }
@@ -186,13 +182,11 @@ class ExoPlayerManager @Inject constructor(
                             // Retry network errors
                             player.prepare()
                         }
-
                         PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
                             // Retry playback for live streams
                             player.seekToDefaultPosition()
                             player.prepare()
                         }
-
                         else -> {
                             // For other errors, reset the player
                             player.stop()
@@ -214,7 +208,6 @@ class ExoPlayerManager @Inject constructor(
                         Log.d(TAG, "Player is ready")
                         currentPlayingView?.get()?.ensureVideoVisible()
                     }
-
                     Player.STATE_ENDED -> {
                         Log.d(TAG, "Player has ended")
                         handleVideoEnded()
@@ -263,29 +256,33 @@ class ExoPlayerManager @Inject constructor(
     }
 
     fun releasePlayer() {
-        if (isReleasing.getAndSet(true)) {
-            Log.d(TAG, "ExoPlayer is already being released")
-            return
-        }
-
-        playerScope.launch {
-            try {
-                currentPlayingView?.get()?.showThumbnail()
-                currentPlayingView?.get()?.shrinkCard()
-                currentPlayingView?.clear()
-                getOrCreatePlayer().let { player ->
-                    player.stop()
-                    playerPool.release(player)
-                }
-                isPlayingVideo.set(false)
-                hasVideoEnded.set(false)
-            } finally {
-                isReleasing.set(false)
+        releasePlayerDebouncer.debounce(Unit) {
+            if (isReleasing.getAndSet(true)) {
+                Log.d(TAG, "ExoPlayer is already being released")
+                return@debounce
             }
-        }
 
-        if (isAndroidVersion9Supported())
-            System.gc()
+            playerScope.launch {
+                try {
+                    currentPlayingView?.get()?.showThumbnail()
+                    currentPlayingView?.get()?.shrinkCard()
+                    currentPlayingView?.clear()
+                    getOrCreatePlayer().let { player ->
+                        player.stop()
+                        playerPool.release(player)
+                    }
+                    isPlayingVideo.set(false)
+                    hasVideoEnded.set(false)
+                } finally {
+                    isReleasing.set(false)
+                }
+            }
+
+            if (isAndroidVersion9Supported())
+                coroutineScope.launch(Dispatchers.Default) {
+                    System.gc()
+                }
+        }
     }
 
     fun onLifecycleDestroy() {
@@ -318,5 +315,17 @@ class ObjectPool<T>(
     fun release(obj: T) {
         reset(obj)
         pool.offer(obj)
+    }
+}
+
+class Debouncer<T>(private val delayMillis: Long) {
+    private var job: Job? = null
+
+    fun debounce(param: T, action: (T) -> Unit) {
+        job?.cancel()
+        job = CoroutineScope(Dispatchers.Main).launch {
+            delay(delayMillis)
+            action(param)
+        }
     }
 }

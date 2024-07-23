@@ -66,24 +66,6 @@ object AppModule {
     }
 
 
-    @Provides
-    @Singleton
-    fun provideRequestOptions(): RequestOptions {
-        return RequestOptions()
-            .placeholder(R.drawable.movie)
-            .error(R.drawable.app_icon_your_company)
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
-    }
-
-    @Provides
-    @Singleton
-    fun provideGlideInstance(
-        @ApplicationContext context: Context,
-        requestOptions: RequestOptions
-    ): RequestManager {
-        return Glide.with(context).setDefaultRequestOptions(requestOptions)
-    }
-
     // For example, if using Retrofit for network calls:
     /*
     @Provides

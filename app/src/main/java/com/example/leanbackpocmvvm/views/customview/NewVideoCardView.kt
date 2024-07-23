@@ -18,12 +18,15 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.annotation.GlideModule
 import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestOptions
 import com.example.leanbackpocmvvm.R
+import com.example.leanbackpocmvvm.application.GlideApp
+import com.example.leanbackpocmvvm.application.YourAppGlideModule
 import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.example.leanbackpocmvvm.utils.dpToPx
 import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
@@ -178,27 +181,29 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun loadImage(imageUrl: String, width: Int, height: Int, imageView: ImageView) {
-        val requestOptions = RequestOptions()
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .centerCrop()
-            .override(width, height)
-            .downsample(DownsampleStrategy.CENTER_INSIDE)
-        if (isAndroidVersion9Supported()) {
-            requestOptions.format(DecodeFormat.PREFER_RGB_565) // Uses less memory
-        }
+//        val requestOptions = RequestOptions()
+//            .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+//            .centerCrop()
+//            .override(width, height)
+//            .downsample(DownsampleStrategy.CENTER_INSIDE)
+//        if (isAndroidVersion9Supported()) {
+//            requestOptions.format(DecodeFormat.PREFER_RGB_565) // Uses less memory
+//        }
 
-        Glide.with(context)
-            .load(imageUrl)
-            .apply(requestOptions)
-            .transition(DrawableTransitionOptions.withCrossFade())
-            .into(imageView)
+        GlideApp.with(context).load(imageUrl).override(width, height).into(imageView)
+//        YourAppGlideModule
+//            .with(context)
+//            .load(imgStringWithHttps)
+//            .override(tileWidth, tileHeight)
+////                .format(DecodeFormat.PREFER_RGB_565)
+//            //.apply(requestOptions)
+////                .transform(RoundedCorners(8))
+//            .into(im)
 
 //        Glide.with(context)
 //            .load(imageUrl)
+//            .apply(requestOptions)
 //            .transition(DrawableTransitionOptions.withCrossFade())
-//            .diskCacheStrategy(DiskCacheStrategy.ALL)
-//            .centerCrop()
-//            .override(width, height)
 //            .into(imageView)
     }
 
@@ -323,7 +328,12 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
                 exoPlayerManager?.setVideoSurface(holder.surface)
             }
 
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            override fun surfaceChanged(
+                holder: SurfaceHolder,
+                format: Int,
+                width: Int,
+                height: Int
+            ) {
                 Log.d(TAG, "Surface changed: format=$format, width=$width, height=$height")
             }
 
