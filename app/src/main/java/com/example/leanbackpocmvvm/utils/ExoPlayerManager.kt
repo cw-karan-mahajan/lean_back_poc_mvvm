@@ -212,7 +212,9 @@ class ExoPlayerManager @Inject constructor(
 
                 Player.STATE_ENDED -> {
                     Log.d(TAG, "Player has ended")
-                    currentPlayingView?.get()?.showThumbnail()
+                    handleVideoEnded()
+                    //currentPlayingView?.get()?.showThumbnail()
+                    //currentPlayingView?.get()?.shrinkCard()
                 }
             }
         }
@@ -240,7 +242,10 @@ class ExoPlayerManager @Inject constructor(
         currentPlayingView?.get()?.let { view ->
             view.resetPlayerView()
             view.shrinkCard()
-            view.onVideoEnded(tileId)
+            if (!isAndroidVersion9Supported()) {
+                // below auto scroll code creating issue while playing videos in version 9
+                view.onVideoEnded(tileId)
+            }
         }
     }
 
