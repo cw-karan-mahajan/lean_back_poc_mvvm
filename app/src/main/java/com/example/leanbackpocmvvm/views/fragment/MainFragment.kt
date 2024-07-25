@@ -15,7 +15,7 @@ import androidx.leanback.app.BrowseSupportFragment
 import androidx.leanback.widget.*
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.R
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager
+import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView

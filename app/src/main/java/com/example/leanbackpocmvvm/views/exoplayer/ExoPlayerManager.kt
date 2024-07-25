@@ -1,4 +1,4 @@
-package com.example.leanbackpocmvvm.utils
+package com.example.leanbackpocmvvm.views.exoplayer
 
 import android.content.Context
 import android.os.Build
@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*

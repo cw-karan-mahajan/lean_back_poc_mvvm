@@ -1,15 +1,13 @@
 package com.example.leanbackpocmvvm.views.presenter
 
 import android.view.ViewGroup
-import androidx.annotation.OptIn
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager
+import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
-import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 
 @UnstableApi
 class CardLayout1(

@@ -8,8 +8,7 @@ import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.MainRepository
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager
-import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
+import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -115,7 +114,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    fun createCardLayout1(lifecycleOwner: LifecycleOwner): CardLayout1 {
+   private fun createCardLayout1(lifecycleOwner: LifecycleOwner): CardLayout1 {
         return CardLayout1(lifecycleOwner, exoPlayerManager, this)
     }
 

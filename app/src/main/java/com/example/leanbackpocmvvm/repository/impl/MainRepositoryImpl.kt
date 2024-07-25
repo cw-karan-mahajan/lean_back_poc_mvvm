@@ -4,6 +4,7 @@ import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.remote.ApiService
 import com.example.leanbackpocmvvm.repository.MainRepository
+import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
 import com.example.leanbackpocmvvm.utils.getResponse
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,7 +20,7 @@ import javax.inject.Singleton
 class MainRepositoryImpl @Inject internal constructor(
     private val authService: ApiService,
     private val networkConnectivity: NetworkConnectivity
-) : MainRepository {
+) : MainRepository1 {
 
     override fun fetchList(): Flow<Resource<MyData2>> = flow {
         if (!networkConnectivity.isConnected()) {
