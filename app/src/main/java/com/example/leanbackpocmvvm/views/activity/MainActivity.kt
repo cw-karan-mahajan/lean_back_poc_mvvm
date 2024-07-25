@@ -6,7 +6,6 @@ import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.views.fragment.MainFragment
 import com.example.leanbackpocmvvm.R
-import com.example.leanbackpocmvvm.views.fragment.VideoTileFragment
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint

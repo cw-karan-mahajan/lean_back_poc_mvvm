@@ -2,14 +2,12 @@ package com.example.leanbackpocmvvm.di
 
 import android.content.Context
 import androidx.media3.common.util.UnstableApi
-import com.bumptech.glide.Glide
-import com.bumptech.glide.RequestManager
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.request.RequestOptions
-import com.example.leanbackpocmvvm.R
-import com.example.leanbackpocmvvm.repository.MainRepository
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager
-import com.example.leanbackpocmvvm.utils.VideoExoPlayerManager
+import com.example.leanbackpocmvvm.core.Constants.BASE_URL
+import com.example.leanbackpocmvvm.remote.ApiService
+import com.example.leanbackpocmvvm.remote.HeaderInterceptor
+import com.example.leanbackpocmvvm.utils.Network
+import com.example.leanbackpocmvvm.utils.NetworkConnectivity
+import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
@@ -19,6 +17,10 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Singleton
 
 @Module
@@ -41,12 +43,39 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideMainRepository(
-        @ApplicationContext context: Context,
-        gson: Gson
-    ): MainRepository {
-        return MainRepository(context, gson)
+    fun provideNetworkConnectivity(@ApplicationContext context: Context): NetworkConnectivity {
+        return Network(context)
     }
+
+    @Provides
+    @Singleton
+    fun provideHeaderInterceptor(): HeaderInterceptor {
+        return HeaderInterceptor()
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(headerInterceptor: HeaderInterceptor): OkHttpClient {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+        return OkHttpClient.Builder()
+            .hostnameVerifier { _, _ -> true }
+            .addInterceptor(headerInterceptor)
+            .addInterceptor(loggingInterceptor)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun providesFetchApi(okHttpClient: OkHttpClient): ApiService = Retrofit
+        .Builder()
+        .client(okHttpClient)
+        .baseUrl(BASE_URL)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+        .create(ApiService::class.java)
+
 
     @UnstableApi
     @Provides
@@ -59,28 +88,4 @@ object AppModule {
     }
 
 
-    @Provides
-    @Singleton
-    fun provideVideoExoPlayerManager(@ApplicationContext context: Context): VideoExoPlayerManager {
-        return VideoExoPlayerManager(context)
-    }
-
-
-    // For example, if using Retrofit for network calls:
-    /*
-    @Provides
-    @Singleton
-    fun provideRetrofit(): Retrofit {
-        return Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    @Provides
-    @Singleton
-    fun provideApiService(retrofit: Retrofit): ApiService {
-        return retrofit.create(ApiService::class.java)
-    }
-    */
 }

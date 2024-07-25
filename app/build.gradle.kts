@@ -80,10 +80,6 @@ dependencies {
     kapt("com.google.dagger:hilt-android-compiler:2.50")
 
 
-//    implementation("androidx.media3:media3-exoplayer:1.3.1")
-//    implementation("androidx.media3:media3-ui:1.3.1")
-//    implementation("androidx.media3:media3-common:1.3.1")
-
     val media3_version = "1.3.1"
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
