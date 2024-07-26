@@ -13,3 +13,5 @@ data class MyData2(
     @SerializedName("rows")
     val rows: List<RowX>
 ) : Serializable
+
+

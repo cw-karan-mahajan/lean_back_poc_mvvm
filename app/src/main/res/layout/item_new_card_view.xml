@@ -30,6 +30,7 @@
             android:id="@+id/focusOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@drawable/focus_onselect_bg"
             android:visibility="invisible"/>
 
     </FrameLayout>
