@@ -36,7 +36,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private val networkChangeReceiver = NetworkChangeReceiver(this)
     private lateinit var rowsAdapter: ArrayObjectAdapter
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val filter = IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
@@ -46,7 +45,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         observeViewModel()
     }
 
@@ -67,7 +65,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                             hideProgressBar()
                             // Show error message
                         }
-
                         else -> {}
                     }
                 }
@@ -91,8 +88,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun setUI() {
         title = "CloudTV"
         headersState = HEADERS_DISABLED
-        rowsAdapter = ArrayObjectAdapter(ListRowPresenter())
-        adapter = rowsAdapter
     }
 
     private fun setupEventListeners() {
@@ -103,13 +98,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 }
             }
         }
-        setOnSearchClickedListener {
-            viewModel.onSearchClicked()
-        }
     }
 
     private fun populateRows(data: MyData2) {
-        rowsAdapter.clear()
+        var lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
+        lrp.shadowEnabled = false
+        lrp.selectEffectEnabled = false
+        rowsAdapter = ArrayObjectAdapter(lrp)
 
         data.rows.forEachIndexed { index, row ->
             val headerItem = HeaderItem(index.toLong(), row.rowHeader)
@@ -126,6 +121,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 rowsAdapter.add(ListRow(headerItem, listRowAdapter))
             }
         }
+        adapter = rowsAdapter
     }
 
 //    private fun findItemIndex(listRow: ListRow?, item: CustomRowItemX): Int {
@@ -206,6 +202,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        viewModel.networkStatus.removeObservers(viewLifecycleOwner)
+        viewModel.toastMessage.removeObservers(viewLifecycleOwner)
     }
 
     companion object {

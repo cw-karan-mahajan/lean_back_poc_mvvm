@@ -13,6 +13,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import javax.inject.Inject
 
@@ -60,12 +61,6 @@ class MainViewModel @Inject constructor(
     fun onItemClicked(item: CustomRowItemX) {
         // Handle item click
     }
-
-    fun onSearchClicked() {
-        // Handle search click
-    }
-
-
 
     override fun onCleared() {
         super.onCleared()
