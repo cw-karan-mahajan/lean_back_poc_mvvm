@@ -27,12 +27,9 @@ class ContentItemPresenter : Presenter() {
         val mWidth = dpToPx(viewHolder.view.context,contentData.width)
         val mHeight = dpToPx(viewHolder.view.context,contentData.height)
 
-
-
         val imgStringWithHttps = contentData.imageUrl.replace("http://", "https://")
         GlideApp.with(binding.thumbnail.context).load(imgStringWithHttps).centerCrop()
             .override(mWidth, mHeight).into(binding.thumbnail)
-
 
         val layoutParams: ViewGroup.LayoutParams = viewHolder.view.layoutParams
         layoutParams.apply {
