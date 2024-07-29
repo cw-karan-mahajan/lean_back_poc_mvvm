@@ -10,6 +10,7 @@ import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.leanback.app.BrowseSupportFragment
@@ -56,6 +57,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         observeViewModel()
+        onBackPressed()
         //addScrollListener()
     }
 
@@ -308,18 +310,30 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         requireActivity().findViewById<ProgressBar>(R.id.progress_bar).visibility = View.GONE
     }
 
+    private fun onBackPressed() {
+        val callback = object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                onDestroy()
+            }
+        }
+
+        // Add the callback to the OnBackPressedDispatcher
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, callback)
+
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         viewModel.networkStatus.removeObservers(viewLifecycleOwner)
         viewModel.toastMessage.removeObservers(viewLifecycleOwner)
         view?.let { Glide.with(this).clear(it) }
+        exoPlayerManager.onLifecycleDestroy()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         requireActivity().unregisterReceiver(networkChangeReceiver)
-        //viewModel.stopVideoPlayback()
-        exoPlayerManager.releasePlayer()
+        exoPlayerManager.onLifecycleDestroy()
         Glide.get(requireContext()).clearMemory()
     }
 

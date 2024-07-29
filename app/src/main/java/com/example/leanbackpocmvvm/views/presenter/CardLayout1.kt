@@ -5,12 +5,10 @@ import androidx.annotation.OptIn
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
-import com.example.leanbackpocmvvm.utils.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
-import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 
 @UnstableApi
 class CardLayout1(
@@ -53,6 +51,7 @@ class CardLayout1(
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
         val cardView = viewHolder.view as NewVideoCardView
         cardView.stopVideoPlayback()
+        mainViewModel.stopVideoPlayback()
         //cardView.updateVideoPlaybackState(VideoPlaybackState.Stopped)
         // No need to do anything here, as video playback is managed by ViewModel
     }

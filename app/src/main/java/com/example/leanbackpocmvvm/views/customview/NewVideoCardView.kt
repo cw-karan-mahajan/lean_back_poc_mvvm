@@ -18,9 +18,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.utils.dpToPx
@@ -177,6 +174,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
     private fun loadImage(imageUrl: String, width: Int, height: Int, imageView: ImageView) {
       val imgUrl =  imageUrl.replace("http://", "https://")
+
         GlideApp.with(context).load(imgUrl).centerCrop()
             .override(width, height).into(imageView)
     }
