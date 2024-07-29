@@ -8,6 +8,7 @@ import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.MainRepository
+import com.example.leanbackpocmvvm.repository.MainRepository1
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +21,8 @@ import javax.inject.Inject
 @UnstableApi
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val repository: MainRepository
+    private val repository: MainRepository,
+    private val apiRepository1: MainRepository1
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -46,22 +48,22 @@ class MainViewModel @Inject constructor(
         }
     }
 
-//    fun fetchData() {
-//        viewModelScope.launch {
-//            repository.fetchList().distinctUntilChanged().collect { response ->
-//                when (response) {
-//                    is Resource.Success -> {
-//                        _uiState.value = UiState.Success(response.data)
-//                        //createRowsAdapter(response.data, lifecycleOwner)
-//                    }
-//                    is Resource.Error -> {
-//                        _uiState.value = UiState.Error(response.message)
-//                        _toastMessage.postValue("Error loading data: ${response.message}")
-//                    }
-//                }
-//            }
-//        }
-//    }
+    fun fetchData() {
+        viewModelScope.launch {
+            apiRepository1.fetchList().distinctUntilChanged().collect { response ->
+                when (response) {
+                    is Resource.Success -> {
+                        _uiState.value = UiState.Success(response.data)
+                        //createRowsAdapter(response.data, lifecycleOwner)
+                    }
+                    is Resource.Error -> {
+                        _uiState.value = UiState.Error(response.message)
+                        _toastMessage.postValue("Error loading data: ${response.message}")
+                    }
+                }
+            }
+        }
+    }
 
     fun setNetworkStatus(isConnected: Boolean) {
         if (isConnected) {
