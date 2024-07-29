@@ -3,8 +3,10 @@ package com.example.leanbackpocmvvm.views.fragment
 import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.Toast
@@ -16,7 +18,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
+import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
 import com.example.leanbackpocmvvm.R
+import com.example.leanbackpocmvvm.application.AvLeanback
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
@@ -46,6 +51,46 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         observeViewModel()
+        //addScrollListener()
+    }
+
+    private fun addScrollListener() {
+        Log.d(TAG, "addScrollListener() called")
+
+        view?.postDelayed({
+            val verticalGridView = findVerticalGridView(view)
+            if (verticalGridView == null) {
+                Log.e(TAG, "VerticalGridView is still null after delayed search")
+                return@postDelayed
+            }
+
+            verticalGridView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    super.onScrollStateChanged(recyclerView, newState)
+                    Log.d(TAG, "Scroll state changed: $newState")
+                    //(requireActivity().application as AvLeanback).resetIdleTimer()
+                }
+
+                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                    super.onScrolled(recyclerView, dx, dy)
+                    Log.d(TAG, "Scrolled: dx=$dx, dy=$dy")
+                }
+            })
+
+            Log.d(TAG, "Scroll listener added to VerticalGridView")
+        }, 500) // Delay for 500ms to allow more time for setup
+    }
+
+    private fun findVerticalGridView(v: View?): VerticalGridView? {
+        if (v == null) return null
+        if (v is VerticalGridView) return v
+        if (v is ViewGroup) {
+            for (i in 0 until v.childCount) {
+                val found = findVerticalGridView(v.getChildAt(i))
+                if (found != null) return found
+            }
+        }
+        return null
     }
 
     private fun observeViewModel() {
@@ -57,14 +102,17 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                             // Show loading indicator
                             showProgressBar()
                         }
+
                         is UiState.Success -> {
                             hideProgressBar()
                             populateRows(state.data)
                         }
+
                         is UiState.Error -> {
                             hideProgressBar()
                             // Show error message
                         }
+
                         else -> {}
                     }
                 }
@@ -83,6 +131,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     override fun onDestroy() {
         super.onDestroy()
         requireActivity().unregisterReceiver(networkChangeReceiver)
+        Glide.get(requireContext()).clearMemory()
+
     }
 
     private fun setUI() {
@@ -90,25 +140,15 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         headersState = HEADERS_DISABLED
     }
 
-    private fun setupEventListeners() {
-        setOnItemViewClickedListener { _, item, _, _ ->
-            when (item) {
-                is CustomRowItemX -> {
-                    viewModel.onItemClicked(item)
-                }
-            }
-        }
-    }
-
     private fun populateRows(data: MyData2) {
         var lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
         lrp.shadowEnabled = false
         lrp.selectEffectEnabled = false
         rowsAdapter = ArrayObjectAdapter(lrp)
-
+        val presenter = ContentItemPresenter()
         data.rows.forEachIndexed { index, row ->
             val headerItem = HeaderItem(index.toLong(), row.rowHeader)
-            val listRowAdapter = ArrayObjectAdapter(ContentItemPresenter())
+            val listRowAdapter = ArrayObjectAdapter(presenter)
 
             row.rowItems.forEach { item ->
                 val customRowItem = CustomRowItemX(item, row.rowLayout, row.rowHeader)
@@ -165,10 +205,10 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 //    }
 
 
-
     override fun connected() {
         viewModel.setNetworkStatus(true)
-        viewModel.fetchData()
+        //viewModel.fetchData()
+        viewModel.loadData()
     }
 
     override fun notconnected() {
@@ -204,6 +244,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         super.onDestroyView()
         viewModel.networkStatus.removeObservers(viewLifecycleOwner)
         viewModel.toastMessage.removeObservers(viewLifecycleOwner)
+        view?.let { Glide.with(this).clear(it) }
     }
 
     companion object {

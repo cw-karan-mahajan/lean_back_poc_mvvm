@@ -6,6 +6,7 @@ import com.example.leanbackpocmvvm.remote.ApiService
 import com.example.leanbackpocmvvm.remote.HeaderInterceptor
 import com.example.leanbackpocmvvm.utils.Network
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
+import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,6 +21,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson = Gson()
 
     @Provides
     @Singleton

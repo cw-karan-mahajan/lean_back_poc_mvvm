@@ -32,22 +32,36 @@ class MainViewModel @Inject constructor(
     private val _toastMessage = MutableLiveData<String>()
     val toastMessage: LiveData<String> = _toastMessage
 
-    fun fetchData() {
-        viewModelScope.launch {
-            repository.fetchList().distinctUntilChanged().collect { response ->
-                when (response) {
-                    is Resource.Success -> {
-                        _uiState.value = UiState.Success(response.data)
-                        //createRowsAdapter(response.data, lifecycleOwner)
-                    }
-                    is Resource.Error -> {
-                        _uiState.value = UiState.Error(response.message)
-                        _toastMessage.postValue("Error loading data: ${response.message}")
-                    }
-                }
+    fun loadData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            //_isLoading.postValue(true)
+            try {
+                val myData2 = repository.getMyData()
+                _uiState.value = UiState.Success(myData2)
+            } catch (e: Exception) {
+                _toastMessage.postValue("Error loading data: ${e.message}")
+            } finally {
+                //_isLoading.postValue(false)
             }
         }
     }
+
+//    fun fetchData() {
+//        viewModelScope.launch {
+//            repository.fetchList().distinctUntilChanged().collect { response ->
+//                when (response) {
+//                    is Resource.Success -> {
+//                        _uiState.value = UiState.Success(response.data)
+//                        //createRowsAdapter(response.data, lifecycleOwner)
+//                    }
+//                    is Resource.Error -> {
+//                        _uiState.value = UiState.Error(response.message)
+//                        _toastMessage.postValue("Error loading data: ${response.message}")
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     fun setNetworkStatus(isConnected: Boolean) {
         if (isConnected) {

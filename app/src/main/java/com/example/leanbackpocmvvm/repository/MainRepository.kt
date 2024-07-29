@@ -11,20 +11,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-interface MainRepository {
+interface MainRepository1 {
     fun fetchList(): Flow<Resource<MyData2>>
 }
 
 
-//class MainRepository @Inject constructor(
-//    @ApplicationContext private val context: Context,
-//    private val gson: Gson
-//) {
-//    suspend fun getMyData(): MyData2 {
-//        val inputStream = context.assets.open("data2.json")
-//        val json: String = inputStream.bufferedReader().use { it.readText() }
-//        inputStream.close()
-//        Log.d("MainRepository", "JSON read: ${json.take(300)}...") // Log first 300 chars
-//        return gson.fromJson(json, MyData2::class.java)
-//    }
-//}
+class MainRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
+    private val gson: Gson
+) {
+    suspend fun getMyData(): MyData2 {
+        val inputStream = context.assets.open("data2.json")
+        val json: String = inputStream.bufferedReader().use { it.readText() }
+        inputStream.close()
+        Log.d("MainRepository", "JSON read: ${json.take(300)}...") // Log first 300 chars
+        return gson.fromJson(json, MyData2::class.java)
+    }
+}

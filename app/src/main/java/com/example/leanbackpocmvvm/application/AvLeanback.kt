@@ -67,7 +67,7 @@ class AvLeanback : Application(), ComponentCallbacks2 {
             if (currentIdleStage < 3) {
                 resetIdleTimer()
             }
-        }, 5 * 60 * 1000) // 5 minutes
+        }, 2 * 60 * 1000) // 2 minutes
     }
 
     private fun setGlideMemorySize(cacheSize: Long) {
