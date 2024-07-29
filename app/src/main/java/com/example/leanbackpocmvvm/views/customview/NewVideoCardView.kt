@@ -19,15 +19,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.utils.dpToPx
+import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @UnstableApi
 class NewVideoCardView(context: Context) : FrameLayout(context) {
@@ -38,7 +39,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private var videoSurface: Surface? = null
     var isVideoPlaying = false
     private val focusOverlay: View
-    private lateinit var thumbnailOverlay: FrameLayout
+    private var thumbnailOverlay: FrameLayout
 
     private var originalWidth: Int = 0
     private var originalHeight: Int = 0
@@ -48,6 +49,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private lateinit var lifecycleOwner: LifecycleOwner
     private lateinit var mainViewModel: MainViewModel
     private lateinit var tileId: String
+    private var isViewAttached = false
+    private var currentImageUrl: String? = null
 
     init {
         layoutParams = ViewGroup.LayoutParams(
@@ -156,6 +159,21 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         })
     }
 
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        isViewAttached = true
+        loadCurrentImage()
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        isViewAttached = false
+        (context as? MainActivity)?.safelyUseGlide {
+            GlideApp.with(context).clear(thumbnailImageView)
+            GlideApp.with(context).clear(posterImageView)
+        }
+    }
+
     fun setTileId(tileId: String) {
         this.tileId = tileId
     }
@@ -169,16 +187,45 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun setImage(imageUrl: String, width: Int, height: Int) {
-        lifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
-            loadImage(imageUrl, width, height, thumbnailImageView)
-            loadImage(imageUrl, width, height, posterImageView)
-        }
+        //if (!isCardDestroying) {
+            currentImageUrl = imageUrl.replace("http://", "https://")
+            loadCurrentImage(width, height)
+       // }
     }
 
-    private fun loadImage(imageUrl: String, width: Int, height: Int, imageView: ImageView) {
-      val imgUrl =  imageUrl.replace("http://", "https://")
-        GlideApp.with(context).load(imgUrl).centerCrop()
-            .override(width, height).into(imageView)
+//    fun setImage(imageUrl: String, width: Int, height: Int) {
+//        // Cancel any ongoing image load for this ImageView
+//        GlideApp.with(context).clear(thumbnailImageView)
+//        GlideApp.with(context).clear(posterImageView)
+//
+//        // Set a placeholder or reset the ImageView
+//        thumbnailImageView.setImageDrawable(null)
+//        posterImageView.setImageDrawable(null)
+//
+//        // Load the new image
+//        val imgUrl = imageUrl.replace("http://", "https://")
+//        currentImageUrl = imgUrl
+//
+//        //loadImage(width, height, thumbnailImageView)
+//        //loadImage(width, height, posterImageView)
+//        loadCurrentImage(width, height)
+//    }
+
+    private fun loadCurrentImage(width: Int = -1, height: Int = -1) {
+        if (isViewAttached &&  currentImageUrl != null) {
+            (context as? MainActivity)?.safelyUseGlide {
+                val requestBuilder = GlideApp.with(context)
+                    .load(currentImageUrl)
+                    .centerCrop()
+
+                if (width > 0 && height > 0) {
+                    requestBuilder.override(width, height)
+                }
+
+                requestBuilder.into(thumbnailImageView)
+                requestBuilder.into(posterImageView)
+            }
+        }
     }
 
     fun stopVideoPlayback() {
@@ -304,7 +351,12 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
                 exoPlayerManager?.setVideoSurface(holder.surface)
             }
 
-            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+            override fun surfaceChanged(
+                holder: SurfaceHolder,
+                format: Int,
+                width: Int,
+                height: Int
+            ) {
                 Log.d(TAG, "Surface changed: format=$format, width=$width, height=$height")
             }
 
@@ -337,7 +389,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         return isFocused
     }
 
-   private fun updateFocusOverlayVisibility() {
+    fun updateFocusOverlayVisibility() {
         val shouldBeVisible = isCardFocused() || isVideoPlaying
         focusOverlay.visibility = if (shouldBeVisible) View.VISIBLE else View.INVISIBLE
     }

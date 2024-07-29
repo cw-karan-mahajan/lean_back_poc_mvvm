@@ -110,28 +110,32 @@ class MainViewModel @Inject constructor(
     }
 
     fun onItemFocused(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
-        lastInteractionTime = System.currentTimeMillis()
+        viewModelScope.launch {
+            lastInteractionTime = System.currentTimeMillis()
 
-        if (rowIndex != currentPlayingRowIndex || itemIndex != currentPlayingItemIndex) {
-            stopAndShrinkPreviousItem()
-            cancelPendingPlayback()
-            pauseAutoScroll()
-        }
-
-        isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
-
-        if (isCurrentRowAutoScrollable) {
-            if (item.rowItemX.videoUrl != null) {
-                scheduleVideoPlay(item, rowIndex, itemIndex)
-            } else {
-                scheduleAutoScrollResume(rowIndex, itemIndex)
+            if (rowIndex != currentPlayingRowIndex || itemIndex != currentPlayingItemIndex) {
+                withContext(Dispatchers.Main) {
+                    stopAndShrinkPreviousItem()
+                }
+                cancelPendingPlayback()
+                pauseAutoScroll()
             }
-        } else if (item.rowItemX.videoUrl != null) {
-            scheduleVideoPlay(item, rowIndex, itemIndex)
-        }
 
-        currentPlayingRowIndex = rowIndex
-        currentPlayingItemIndex = itemIndex
+            isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
+
+            if (isCurrentRowAutoScrollable) {
+                if (item.rowItemX.videoUrl != null) {
+                    scheduleVideoPlay(item, rowIndex, itemIndex)
+                } else {
+                    scheduleAutoScrollResume(rowIndex, itemIndex)
+                }
+            } else if (item.rowItemX.videoUrl != null) {
+                scheduleVideoPlay(item, rowIndex, itemIndex)
+            }
+
+            currentPlayingRowIndex = rowIndex
+            currentPlayingItemIndex = itemIndex
+        }
     }
 
     private fun isAutoScrollableRow(rowIndex: Int): Boolean {
@@ -244,19 +248,18 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleVideoEnded(tileId: String) {
-        _videoPlaybackState.value = VideoPlaybackState.Stopped
-        _shrinkCardCommand.value = tileId
-        isVideoPlaying = false
-        currentlyPlayingVideoTileId = null
+        viewModelScope.launch(Dispatchers.Main) {
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            _shrinkCardCommand.value = tileId
+            isVideoPlaying = false
+            currentlyPlayingVideoTileId = null
 
-        if (isCurrentRowAutoScrollable) {
-            // For auto-scrollable rows, wait 5 seconds before resuming auto-scroll
-            delayJob = viewModelScope.launch {
+            if (isCurrentRowAutoScrollable) {
+                // For auto-scrollable rows, wait 5 seconds before resuming auto-scroll
                 delay(AUTO_SCROLL_DELAY)
                 scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
             }
         }
-        // For non-scrollable rows, do nothing after video ends
     }
 
     private fun stopAndShrinkPreviousItem() {

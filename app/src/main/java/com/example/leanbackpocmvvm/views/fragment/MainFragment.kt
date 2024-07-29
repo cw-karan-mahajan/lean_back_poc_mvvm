@@ -6,10 +6,10 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.leanback.app.BrowseSupportFragment
@@ -19,20 +19,20 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
-import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
+import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
-import com.example.leanbackpocmvvm.views.presenter.ContentItemPresenter
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.UiState
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -43,8 +43,10 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private val viewModel: MainViewModel by viewModels()
     private val networkChangeReceiver = NetworkChangeReceiver(this)
     private lateinit var rowsAdapter: ArrayObjectAdapter
+
     @Inject
     lateinit var exoPlayerManager: ExoPlayerManager
+    private var isFragmentDestroyed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,46 +58,12 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         observeViewModel()
-        //addScrollListener()
+        setupBackPressHandler()
     }
 
-    private fun addScrollListener() {
-        Log.d(TAG, "addScrollListener() called")
-
-        view?.postDelayed({
-            val verticalGridView = findVerticalGridView(view)
-            if (verticalGridView == null) {
-                Log.e(TAG, "VerticalGridView is still null after delayed search")
-                return@postDelayed
-            }
-
-            verticalGridView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-                    super.onScrollStateChanged(recyclerView, newState)
-                    Log.d(TAG, "Scroll state changed: $newState")
-                    //(requireActivity().application as AvLeanback).resetIdleTimer()
-                }
-
-                override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                    super.onScrolled(recyclerView, dx, dy)
-                    Log.d(TAG, "Scrolled: dx=$dx, dy=$dy")
-                }
-            })
-
-            Log.d(TAG, "Scroll listener added to VerticalGridView")
-        }, 500) // Delay for 500ms to allow more time for setup
-    }
-
-    private fun findVerticalGridView(v: View?): VerticalGridView? {
-        if (v == null) return null
-        if (v is VerticalGridView) return v
-        if (v is ViewGroup) {
-            for (i in 0 until v.childCount) {
-                val found = findVerticalGridView(v.getChildAt(i))
-                if (found != null) return found
-            }
-        }
-        return null
+    private fun setUI() {
+        title = "CloudTV"
+        headersState = HEADERS_DISABLED
     }
 
     private fun observeViewModel() {
@@ -103,24 +71,17 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state ->
                     when (state) {
-                        is UiState.Loading -> {
-                            // Show loading indicator
-                            showProgressBar()
-                        }
-
+                        is UiState.Loading -> showProgressBar()
                         is UiState.Success -> {
                             hideProgressBar()
                             populateRows(state.data)
                             viewModel.mRowsAdapter = rowsAdapter
                             setupEventListeners()
                         }
-
                         is UiState.Error -> {
                             hideProgressBar()
-                            // Show error message
+                            Toast.makeText(context, "Error: ${state.message}", Toast.LENGTH_LONG).show()
                         }
-
-                        else -> {}
                     }
                 }
             }
@@ -132,10 +93,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.autoScrollCommand.observe(viewLifecycleOwner) { command ->
-            Log.d(
-                TAG,
-                "Received AutoScrollCommand: rowIndex=${command.rowIndex}, itemIndex=${command.itemIndex}"
-            )
             scrollToItem(command.rowIndex, command.itemIndex)
         }
 
@@ -171,7 +128,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                         viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }
-
                 else -> {
                     viewModel.stopAutoScroll()
                     viewModel.stopVideoPlayback()
@@ -190,17 +146,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
     }
 
-    private fun setUI() {
-        title = "CloudTV"
-        headersState = HEADERS_DISABLED
-    }
-
     private fun populateRows(data: MyData2) {
-        var lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false)
-        lrp.shadowEnabled = false
-        lrp.selectEffectEnabled = false
+        val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
+            shadowEnabled = false
+            selectEffectEnabled = false
+        }
         rowsAdapter = ArrayObjectAdapter(lrp)
-        val presenter = createCardLayout(viewLifecycleOwner)//ContentItemPresenter()
+        val presenter = createCardLayout(viewLifecycleOwner)
+
         data.rows.forEachIndexed { index, row ->
             val headerItem = HeaderItem(index.toLong(), row.rowHeader)
             val listRowAdapter = ArrayObjectAdapter(presenter)
@@ -219,19 +172,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         adapter = rowsAdapter
     }
 
-    fun createCardLayout(lifecycleOwner: LifecycleOwner): CardLayout1 {
+    private fun createCardLayout(lifecycleOwner: LifecycleOwner): CardLayout1 {
         return CardLayout1(lifecycleOwner, exoPlayerManager, viewModel)
     }
 
     private fun findItemIndex(listRow: ListRow?, item: CustomRowItemX): Int {
         if (listRow == null) return -1
         val adapter = listRow.adapter as? ArrayObjectAdapter ?: return -1
-        for (i in 0 until adapter.size()) {
-            if (adapter.get(i) == item) {
-                return i
-            }
-        }
-        return -1
+        return (0 until adapter.size()).firstOrNull { adapter.get(it) == item } ?: -1
     }
 
     private fun scrollToItem(rowIndex: Int, itemIndex: Int) {
@@ -247,8 +195,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
                 horizontalGridView?.postDelayed({
                     focusOnItem(horizontalGridView, itemIndex)
-                }, 200) // Delay to ensure horizontal scroll has completed
-            }, 200) // Delay to ensure vertical scroll has completed
+                }, 200)
+            }, 200)
         }
     }
 
@@ -266,16 +214,11 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun focusOnItem(horizontalGridView: HorizontalGridView?, itemIndex: Int) {
         val viewHolder = horizontalGridView?.findViewHolderForAdapterPosition(itemIndex)
         val itemView = viewHolder?.itemView as? NewVideoCardView
-        itemView?.let {
-            Log.d(TAG, "Requesting focus for item at index $itemIndex")
-            it.requestFocus()
-        } ?: Log.e(TAG, "Failed to find item view at index $itemIndex")
+        itemView?.requestFocus()
     }
-
 
     override fun connected() {
         viewModel.setNetworkStatus(true)
-        //viewModel.fetchData()
         viewModel.loadData()
     }
 
@@ -284,19 +227,21 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun updateNetworkUI(isConnected: Boolean) {
-        val offlineText = requireActivity().findViewById<ImageView>(R.id.offline_text)
-        val wifiLogo = requireActivity().findViewById<ImageView>(R.id.wifilogo)
+        if (isFragmentDestroyed) return
 
-        if (isConnected) {
-            offlineText.visibility = View.GONE
-            val drawable =
-                ContextCompat.getDrawable(requireContext(), R.drawable.wifi_connected_white_filled)
-            wifiLogo.setImageDrawable(drawable)
-        } else {
-            offlineText.visibility = View.VISIBLE
-            val drawable =
-                ContextCompat.getDrawable(requireContext(), R.drawable.wifi_disconnected_white)
-            wifiLogo.setImageDrawable(drawable)
+        (requireActivity() as? MainActivity)?.safelyUseGlide {
+            val offlineText = requireActivity().findViewById<ImageView>(R.id.offline_text)
+            val wifiLogo = requireActivity().findViewById<ImageView>(R.id.wifilogo)
+
+            if (isConnected) {
+                offlineText.visibility = View.GONE
+                val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.wifi_connected_white_filled)
+                wifiLogo.setImageDrawable(drawable)
+            } else {
+                offlineText.visibility = View.VISIBLE
+                val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.wifi_disconnected_white)
+                wifiLogo.setImageDrawable(drawable)
+            }
         }
     }
 
@@ -308,19 +253,65 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         requireActivity().findViewById<ProgressBar>(R.id.progress_bar).visibility = View.GONE
     }
 
+    private fun setupBackPressHandler() {
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                isFragmentDestroyed = true
+                viewModel.stopAutoScroll()
+                viewModel.stopVideoPlayback()
+                requireActivity().finish()
+            }
+        })
+    }
+
+    override fun onPause() {
+        super.onPause()
+        exoPlayerManager.releasePlayer()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        isFragmentDestroyed = true
+        viewLifecycleOwner.lifecycleScope.coroutineContext.cancelChildren()
+        // Remove observers
         viewModel.networkStatus.removeObservers(viewLifecycleOwner)
         viewModel.toastMessage.removeObservers(viewLifecycleOwner)
-        view?.let { Glide.with(this).clear(it) }
+        viewModel.playVideoCommand.removeObservers(viewLifecycleOwner)
+        viewModel.autoScrollCommand.removeObservers(viewLifecycleOwner)
+        viewModel.shrinkCardCommand.removeObservers(viewLifecycleOwner)
+        viewModel.resetCardCommand.removeObservers(viewLifecycleOwner)
+
+        // Stop any ongoing video playback
+        viewModel.stopVideoPlayback()
+
+        // Clear references
+        rowsAdapter = ArrayObjectAdapter()
+        adapter = null
+
+        // Cancel any ongoing Glide requests
+        (activity as? MainActivity)?.safelyUseGlide {
+            view?.let {
+                Glide.with(this).pauseRequests()
+                Glide.with(this).clear(it)
+            }
+        }
+
+        Log.d(TAG, "onDestroyView called")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        requireActivity().unregisterReceiver(networkChangeReceiver)
-        //viewModel.stopVideoPlayback()
-        exoPlayerManager.releasePlayer()
-        Glide.get(requireContext()).clearMemory()
+        if (!isFragmentDestroyed) {
+            try {
+                requireActivity().unregisterReceiver(networkChangeReceiver)
+            } catch (e: IllegalArgumentException) {
+                Log.e(TAG, "NetworkChangeReceiver not registered or already unregistered", e)
+            }
+
+            exoPlayerManager.onLifecycleDestroy()
+        }
+
+        Log.d(TAG, "onDestroy called")
     }
 
     companion object {
