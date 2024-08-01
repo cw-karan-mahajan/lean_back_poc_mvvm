@@ -33,7 +33,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         isActivityDestroyed = true
-        Glide.with(this).pauseRequests()
+
+        // Clear all fragments
+        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
+        if (fragment is MainFragment) {
+            fragment.onDestroy()
+        }
+
         super.onDestroy()
     }
 }

@@ -41,7 +41,7 @@ import javax.inject.Inject
 class MainFragment : BrowseSupportFragment(), isConnected {
 
     private val viewModel: MainViewModel by viewModels()
-    private val networkChangeReceiver = NetworkChangeReceiver(this)
+    private var networkChangeReceiver: NetworkChangeReceiver? = null
     private lateinit var rowsAdapter: ArrayObjectAdapter
 
     @Inject
@@ -50,6 +50,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        networkChangeReceiver = NetworkChangeReceiver(this)
         val filter = IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION)
         requireActivity().registerReceiver(networkChangeReceiver, filter)
         setUI()
@@ -271,9 +272,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        isFragmentDestroyed = true
-        viewLifecycleOwner.lifecycleScope.coroutineContext.cancelChildren()
-        // Remove observers
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.DESTROYED) {
+                viewLifecycleOwner.lifecycleScope.coroutineContext.cancelChildren()
+            }
+        }
+
         viewModel.networkStatus.removeObservers(viewLifecycleOwner)
         viewModel.toastMessage.removeObservers(viewLifecycleOwner)
         viewModel.playVideoCommand.removeObservers(viewLifecycleOwner)
@@ -281,37 +286,37 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.shrinkCardCommand.removeObservers(viewLifecycleOwner)
         viewModel.resetCardCommand.removeObservers(viewLifecycleOwner)
 
-        // Stop any ongoing video playback
-        viewModel.stopVideoPlayback()
-
-        // Clear references
         rowsAdapter = ArrayObjectAdapter()
-        adapter = null
 
-        // Cancel any ongoing Glide requests
-        (activity as? MainActivity)?.safelyUseGlide {
-            view?.let {
-                Glide.with(this).pauseRequests()
-                Glide.with(this).clear(it)
-            }
+        view?.let {
+            Glide.with(this).clear(it)
         }
+
+        (view as? ViewGroup)?.removeAllViews()
 
         Log.d(TAG, "onDestroyView called")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        if (!isFragmentDestroyed) {
+        viewModel.stopAutoScroll()
+        exoPlayerManager.onLifecycleDestroy()
+
+        adapter = null
+        unregisterNetworkReceiver()
+
+        Log.d(TAG, "onDestroy called")
+    }
+
+    private fun unregisterNetworkReceiver() {
+        networkChangeReceiver?.let { receiver ->
             try {
-                requireActivity().unregisterReceiver(networkChangeReceiver)
+                requireActivity().unregisterReceiver(receiver)
             } catch (e: IllegalArgumentException) {
                 Log.e(TAG, "NetworkChangeReceiver not registered or already unregistered", e)
             }
-
-            exoPlayerManager.onLifecycleDestroy()
+            networkChangeReceiver = null
         }
-
-        Log.d(TAG, "onDestroy called")
     }
 
     companion object {

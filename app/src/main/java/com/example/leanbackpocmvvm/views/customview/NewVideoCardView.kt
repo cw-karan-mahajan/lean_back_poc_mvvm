@@ -225,8 +225,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         isVideoPlaying = false
         shrinkCard()
         updateFocusOverlayVisibility()
+        (context as? MainActivity)?.safelyUseGlide {
         GlideApp.with(context).clear(thumbnailImageView)
         GlideApp.with(context).clear(posterImageView)
+            }
     }
 
     fun setExoPlayerManager(manager: ExoPlayerManager) {
