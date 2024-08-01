@@ -4,6 +4,7 @@ import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -19,6 +20,10 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.models.MyData2
@@ -48,6 +53,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     lateinit var exoPlayerManager: ExoPlayerManager
     private var isFragmentDestroyed = false
 
+    private lateinit var sharedPlayerView: PlayerView
+    private var currentPlayingCard: NewVideoCardView? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         networkChangeReceiver = NetworkChangeReceiver(this)
@@ -56,10 +64,30 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         setUI()
     }
 
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        val view = super.onCreateView(inflater, container, savedInstanceState)
+
+        sharedPlayerView = PlayerView(requireContext()).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            useController = false
+        }
+
+        return view
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         observeViewModel()
         setupBackPressHandler()
+        setupScrollListener()
     }
 
     private fun setUI() {
@@ -90,7 +118,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         viewModel.playVideoCommand.observe(viewLifecycleOwner) { command ->
             val cardView = view?.findViewWithTag<NewVideoCardView>(command.tileId)
-            cardView?.let { command.playAction(it, command.tileId) }
+            cardView?.let { prepareVideoPlayback(it, command.videoUrl, command.tileId) }
         }
 
         viewModel.autoScrollCommand.observe(viewLifecycleOwner) { command ->
@@ -115,6 +143,35 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.toastMessage.observe(viewLifecycleOwner) { message ->
             Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
+
+        viewModel.preloadVideoCommand.observe(viewLifecycleOwner) { command ->
+            exoPlayerManager.preloadVideo(command.videoUrl)
+        }
+    }
+
+    private fun prepareVideoPlayback(cardView: NewVideoCardView, videoUrl: String, tileId: String) {
+        // Stop any currently playing video
+        stopVideoPlayback()
+
+        // Set the new current playing card
+        currentPlayingCard = cardView
+
+        // Remove PlayerView from its current parent
+        (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
+
+        cardView.prepareForVideoPlayback()
+        cardView.videoPlaceholder.addView(sharedPlayerView)
+
+        exoPlayerManager.prepareVideo(videoUrl, sharedPlayerView,
+            onReady = { isReady ->
+                if (isReady) {
+                    cardView.startVideoPlayback()
+                }
+            },
+            onEnded = {
+                viewModel.onVideoEnded(tileId)
+            }
+        )
     }
 
     private fun setupEventListeners() {
@@ -123,7 +180,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 is CustomRowItemX -> {
                     val cardView = itemViewHolder?.view as? NewVideoCardView
                     if (cardView != null) {
-                        cardView.setExoPlayerManager(exoPlayerManager)
                         val rowIndex = rowsAdapter.indexOf(row)
                         val itemIndex = findItemIndex(row as? ListRow, item)
                         viewModel.onItemFocused(item, rowIndex, itemIndex)
@@ -131,7 +187,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 }
                 else -> {
                     viewModel.stopAutoScroll()
-                    viewModel.stopVideoPlayback()
+                    stopVideoPlayback()
                 }
             }
         }
@@ -218,6 +274,48 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         itemView?.requestFocus()
     }
 
+    private fun setupScrollListener() {
+        val verticalGridView = view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+        verticalGridView?.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                super.onScrolled(recyclerView, dx, dy)
+                val visibleItemCount = verticalGridView.childCount
+                Log.e(TAG, "visibleItemCount $visibleItemCount")
+
+                preloadVisibleItems()
+            }
+        })
+    }
+
+    private fun preloadVisibleItems() {
+        val verticalGridView = view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+        if (verticalGridView == null) return
+
+        val layoutManager = verticalGridView.layoutManager as? LinearLayoutManager ?: return
+        val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
+        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
+
+
+        if (firstVisiblePosition == RecyclerView.NO_POSITION || lastVisiblePosition == RecyclerView.NO_POSITION) return
+
+        for (i in firstVisiblePosition..lastVisiblePosition) {
+            val row = rowsAdapter.get(i) as? ListRow ?: continue
+            val adapter = row.adapter as? ArrayObjectAdapter ?: continue
+
+            for (j in 0 until adapter.size()) {
+                val item = adapter.get(j) as? CustomRowItemX ?: continue
+                viewModel.preloadVideo(item)
+            }
+        }
+    }
+
+    private fun stopVideoPlayback() {
+        exoPlayerManager.releasePlayer()
+        (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
+        currentPlayingCard?.endVideoPlayback()
+        currentPlayingCard = null
+    }
+
     override fun connected() {
         viewModel.setNetworkStatus(true)
         viewModel.loadData()
@@ -259,7 +357,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             override fun handleOnBackPressed() {
                 isFragmentDestroyed = true
                 viewModel.stopAutoScroll()
-                viewModel.stopVideoPlayback()
+                stopVideoPlayback()
                 requireActivity().finish()
             }
         })
@@ -267,7 +365,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun onPause() {
         super.onPause()
-        exoPlayerManager.releasePlayer()
+        stopVideoPlayback()
     }
 
     override fun onDestroyView() {
@@ -285,6 +383,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.autoScrollCommand.removeObservers(viewLifecycleOwner)
         viewModel.shrinkCardCommand.removeObservers(viewLifecycleOwner)
         viewModel.resetCardCommand.removeObservers(viewLifecycleOwner)
+        viewModel.preloadVideoCommand.removeObservers(viewLifecycleOwner)
 
         rowsAdapter = ArrayObjectAdapter()
 
@@ -300,6 +399,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     override fun onDestroy() {
         super.onDestroy()
         viewModel.stopAutoScroll()
+        stopVideoPlayback()
         exoPlayerManager.onLifecycleDestroy()
 
         adapter = null

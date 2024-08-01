@@ -10,6 +10,7 @@ import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.application.GlideApp
+import com.example.leanbackpocmvvm.views.activity.MainActivity
 
 @UnstableApi
 class CardLayout1(
@@ -62,9 +63,15 @@ class CardLayout1(
         val customViewHolder = viewHolder as CustomViewHolder
         customViewHolder.boundItemId = null
         val cardView = customViewHolder.cardView
-        cardView.stopVideoPlayback()
+        cardView.resetCardState()
+
         GlideApp.with(cardView.context).clear(cardView)
+//        try {
+//            GlideApp.with(cardView.context).clear(cardView)
+//        } catch (e: IllegalArgumentException) {
+//             //Activity was already destroyed, ignore
+//        }
         // If you want to stop video playback here as well, uncomment the next line
-        // exoPlayerManager.releasePlayer()
+
     }
 }
