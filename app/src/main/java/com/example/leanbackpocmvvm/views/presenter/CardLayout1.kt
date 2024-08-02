@@ -64,13 +64,11 @@ class CardLayout1(
         customViewHolder.boundItemId = null
         val cardView = customViewHolder.cardView
         cardView.resetCardState()
-
-        GlideApp.with(cardView.context).clear(cardView)
-//        try {
-//            GlideApp.with(cardView.context).clear(cardView)
-//        } catch (e: IllegalArgumentException) {
-//             //Activity was already destroyed, ignore
-//        }
+        try {
+            GlideApp.with(cardView.context).clear(cardView)
+        } catch (e: IllegalArgumentException) {
+             //Activity was already destroyed, ignore
+        }
         // If you want to stop video playback here as well, uncomment the next line
 
     }
