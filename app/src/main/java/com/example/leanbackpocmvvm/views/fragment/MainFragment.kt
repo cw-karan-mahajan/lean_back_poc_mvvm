@@ -113,9 +113,11 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                             viewModel.mRowsAdapter = rowsAdapter
                             setupEventListeners()
                         }
+
                         is UiState.Error -> {
                             hideProgressBar()
-                            Toast.makeText(context, "Error: ${state.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Error: ${state.message}", Toast.LENGTH_LONG)
+                                .show()
                         }
                     }
                 }
@@ -191,6 +193,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                         viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }
+
                 else -> {
                     viewModel.stopAutoScroll()
                     stopVideoPlayback()
@@ -247,12 +250,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     private fun scrollToItem(rowIndex: Int, itemIndex: Int) {
         view?.post {
-            val verticalGridView = view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+            val verticalGridView =
+                view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
             verticalGridView?.smoothScrollToPosition(rowIndex)
 
             verticalGridView?.postDelayed({
                 val rowView = findRowView(verticalGridView, rowIndex)
-                val horizontalGridView = rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
+                val horizontalGridView =
+                    rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
                 horizontalGridView?.smoothScrollToPosition(itemIndex)
 
                 horizontalGridView?.postDelayed({
@@ -281,11 +286,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     // scroll listener
     private fun setupScrollListener(fragmentView: View) {
-        fragmentView.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+        fragmentView.viewTreeObserver.addOnGlobalLayoutListener(object :
+            ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
                 fragmentView.viewTreeObserver.removeOnGlobalLayoutListener(this)
 
-                val verticalGridView = fragmentView.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+                val verticalGridView =
+                    fragmentView.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
                 if (verticalGridView == null) {
                     Log.e(TAG, "VerticalGridView not found")
                     return
@@ -299,7 +306,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun observeVerticalGridView(verticalGridView: VerticalGridView) {
-        verticalGridView.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+        verticalGridView.viewTreeObserver.addOnGlobalLayoutListener(object :
+            ViewTreeObserver.OnGlobalLayoutListener {
             override fun onGlobalLayout() {
                 val layoutManager = verticalGridView.layoutManager
                 if (layoutManager != null) {
@@ -323,6 +331,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                         Log.d(TAG, "Scroll State: IDLE")
                         updateVisibleItemsCount(verticalGridView)
                     }
+
                     RecyclerView.SCROLL_STATE_DRAGGING -> Log.d(TAG, "Scroll State: DRAGGING")
                     RecyclerView.SCROLL_STATE_SETTLING -> Log.d(TAG, "Scroll State: SETTLING")
                 }
@@ -342,6 +351,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }, 500) // 500ms delay
     }
 
+
+    // This method retrieves only fully visible items, not partially.
     private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
         val layoutManager = verticalGridView.layoutManager
         if (layoutManager == null) {
@@ -358,7 +369,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         val visibleRowCount = verticalGridView.childCount
         Log.d(TAG, "Visible row count: $visibleRowCount")
 
-        var totalVisibleItemsCount = 0
         var fullyVisibleItemsCount = 0
 
         for (i in 0 until visibleRowCount) {
@@ -373,28 +383,87 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 val rowItemCount = rowAdapter?.itemCount ?: 0
                 val rowVisibleItemCount = horizontalGridView.childCount
 
-                totalVisibleItemsCount += rowVisibleItemCount
-
+                var rowFullyVisibleItemsCount = 0
                 // Count fully visible items in this row
                 for (j in 0 until rowVisibleItemCount) {
                     val itemView = horizontalGridView.getChildAt(j)
                     if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
-                        fullyVisibleItemsCount++
+                        rowFullyVisibleItemsCount++
                     }
                 }
 
-                Log.d(TAG, "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount")
+                fullyVisibleItemsCount += rowFullyVisibleItemsCount
+
+                Log.d(
+                    TAG,
+                    "Row $i - Total items: $rowItemCount, Fully visible items: $rowFullyVisibleItemsCount"
+                )
             } else {
                 Log.d(TAG, "Row $i - HorizontalGridView not found")
             }
         }
 
-        Log.d(TAG, "Total visible items across all rows: $totalVisibleItemsCount")
         Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
 
         // Log the height of the VerticalGridView
         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
     }
+
+
+    // This method retrieves all visible items, whether fully or partially.
+//    private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
+//        val layoutManager = verticalGridView.layoutManager
+//        if (layoutManager == null) {
+//            Log.e(TAG, "LayoutManager is null, retrying...")
+//            verticalGridView.post { updateVisibleItemsCount(verticalGridView) }
+//            return
+//        }
+//
+//        Log.d(TAG, "LayoutManager type: ${layoutManager.javaClass.simpleName}")
+//
+//        val itemCount = verticalGridView.adapter?.itemCount ?: 0
+//        Log.d(TAG, "Total row count: $itemCount")
+//
+//        val visibleRowCount = verticalGridView.childCount
+//        Log.d(TAG, "Visible row count: $visibleRowCount")
+//
+//        var totalVisibleItemsCount = 0
+//        var fullyVisibleItemsCount = 0
+//
+//        for (i in 0 until visibleRowCount) {
+//            val rowView = verticalGridView.getChildAt(i)
+//            Log.d(TAG, "Row $i view type: ${rowView.javaClass.simpleName}")
+//
+//            // Find the HorizontalGridView within the row
+//            val horizontalGridView = findHorizontalGridView(rowView)
+//
+//            if (horizontalGridView != null) {
+//                val rowAdapter = horizontalGridView.adapter
+//                val rowItemCount = rowAdapter?.itemCount ?: 0
+//                val rowVisibleItemCount = horizontalGridView.childCount
+//
+//                totalVisibleItemsCount += rowVisibleItemCount
+//
+//                // Count fully visible items in this row
+//                for (j in 0 until rowVisibleItemCount) {
+//                    val itemView = horizontalGridView.getChildAt(j)
+//                    if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
+//                        fullyVisibleItemsCount++
+//                    }
+//                }
+//
+//                Log.d(TAG, "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount")
+//            } else {
+//                Log.d(TAG, "Row $i - HorizontalGridView not found")
+//            }
+//        }
+//
+//        Log.d(TAG, "Total visible items across all rows: $totalVisibleItemsCount")
+//        Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
+//
+//        // Log the height of the VerticalGridView
+//        Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
+//    }
 
     private fun findHorizontalGridView(view: View): HorizontalGridView? {
         if (view is HorizontalGridView) {
@@ -412,7 +481,11 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         return null
     }
 
-    private fun isViewFullyVisible(parent: ViewGroup, view: View): Boolean {
+    /* This ensures that we only count an item as fully or partially visible if its entire area
+       unction ensures that we only count items that are completely within the bounds of their parent
+       HorizontalGridView.*/
+
+    /* private fun isViewFullyVisible(parent: ViewGroup, view: View): Boolean {
         val parentBounds = Rect()
         val viewBounds = Rect()
 
@@ -423,6 +496,24 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 viewBounds.right <= parentBounds.right &&
                 viewBounds.top >= parentBounds.top &&
                 viewBounds.bottom <= parentBounds.bottom
+    } */
+
+    /* This ensures that we only count an item as fully visible if its entire area is within the
+     parent's bounds and no part of it is cut off. */
+    private fun isViewFullyVisible(parent: ViewGroup, view: View): Boolean {
+        val parentBounds = Rect()
+        val viewBounds = Rect()
+
+        parent.getGlobalVisibleRect(parentBounds)
+        view.getGlobalVisibleRect(viewBounds)
+
+        // Check if the view is completely within the parent's bounds
+        return viewBounds.left >= parentBounds.left &&
+                viewBounds.right <= parentBounds.right &&
+                viewBounds.top >= parentBounds.top &&
+                viewBounds.bottom <= parentBounds.bottom &&
+                viewBounds.width() == view.width &&  // Ensure the full width is visible
+                viewBounds.height() == view.height   // Ensure the full height is visible
     }
 
     private fun forceLayoutAndUpdateCount(verticalGridView: VerticalGridView) {
@@ -434,7 +525,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun preloadVisibleItems() {
-        val verticalGridView = view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+        val verticalGridView =
+            view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
         if (verticalGridView == null) return
 
         val layoutManager = verticalGridView.layoutManager as? LinearLayoutManager ?: return
@@ -480,11 +572,15 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
             if (isConnected) {
                 offlineText.visibility = View.GONE
-                val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.wifi_connected_white_filled)
+                val drawable = ContextCompat.getDrawable(
+                    requireContext(),
+                    R.drawable.wifi_connected_white_filled
+                )
                 wifiLogo.setImageDrawable(drawable)
             } else {
                 offlineText.visibility = View.VISIBLE
-                val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.wifi_disconnected_white)
+                val drawable =
+                    ContextCompat.getDrawable(requireContext(), R.drawable.wifi_disconnected_white)
                 wifiLogo.setImageDrawable(drawable)
             }
         }
@@ -499,11 +595,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun setupBackPressHandler() {
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                cleanupAndExit()
-            }
-        })
+        requireActivity().onBackPressedDispatcher.addCallback(
+            viewLifecycleOwner,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    cleanupAndExit()
+                }
+            })
     }
 
     private fun cleanupAndExit() {
