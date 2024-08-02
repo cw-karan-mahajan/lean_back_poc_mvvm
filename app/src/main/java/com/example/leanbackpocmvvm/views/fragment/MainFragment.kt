@@ -351,8 +351,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }, 500) // 500ms delay
     }
 
-
-    // This method retrieves only fully visible items, not partially.
+    // This method retrieves fully visible items and partially visible items separately.
     private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
         val layoutManager = verticalGridView.layoutManager
         if (layoutManager == null) {
@@ -369,7 +368,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         val visibleRowCount = verticalGridView.childCount
         Log.d(TAG, "Visible row count: $visibleRowCount")
 
-        var fullyVisibleItemsCount = 0
+        var totalFullyVisibleItemsCount = 0
+        var totalPartiallyVisibleItemsCount = 0
 
         for (i in 0 until visibleRowCount) {
             val rowView = verticalGridView.getChildAt(i)
@@ -384,86 +384,182 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 val rowVisibleItemCount = horizontalGridView.childCount
 
                 var rowFullyVisibleItemsCount = 0
-                // Count fully visible items in this row
+                var rowPartiallyVisibleItemsCount = 0
+
+                // Count fully and partially visible items in this row
                 for (j in 0 until rowVisibleItemCount) {
                     val itemView = horizontalGridView.getChildAt(j)
-                    if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
-                        rowFullyVisibleItemsCount++
+                    if (itemView != null) {
+                        when {
+                            isViewFullyVisible(
+                                horizontalGridView,
+                                itemView
+                            ) -> rowFullyVisibleItemsCount++
+
+                            isViewPartiallyVisible(
+                                horizontalGridView,
+                                itemView
+                            ) -> rowPartiallyVisibleItemsCount++
+                        }
                     }
+                    Log.d(
+                        TAG,
+                        "Row $i, Item $j - Fully visible: ${
+                            isViewFullyVisible(
+                                horizontalGridView,
+                                itemView
+                            )
+                        }, Partially visible: ${
+                            isViewPartiallyVisible(
+                                horizontalGridView,
+                                itemView
+                            )
+                        }"
+                    )
                 }
 
-                fullyVisibleItemsCount += rowFullyVisibleItemsCount
+                totalFullyVisibleItemsCount += rowFullyVisibleItemsCount
+                totalPartiallyVisibleItemsCount += rowPartiallyVisibleItemsCount
 
                 Log.d(
                     TAG,
-                    "Row $i - Total items: $rowItemCount, Fully visible items: $rowFullyVisibleItemsCount"
+                    "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount," +
+                            " Fully visible items: $rowFullyVisibleItemsCount, Partially visible items:" +
+                            " $rowPartiallyVisibleItemsCount"
                 )
             } else {
                 Log.d(TAG, "Row $i - HorizontalGridView not found")
             }
         }
 
-        Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
+        Log.d(TAG, "Total fully visible items across all rows: $totalFullyVisibleItemsCount")
+        Log.d(
+            TAG,
+            "Total partially visible items across all rows: $totalPartiallyVisibleItemsCount"
+        )
+        Log.d(
+            TAG,
+            "Total visible items (fully + partially) across all rows: " +
+                    "${totalFullyVisibleItemsCount + totalPartiallyVisibleItemsCount}"
+        )
 
         // Log the height of the VerticalGridView
         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
     }
 
 
+    // This method retrieves only fully visible items, not partially.
+    /* private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
+         val layoutManager = verticalGridView.layoutManager
+         if (layoutManager == null) {
+             Log.e(TAG, "LayoutManager is null, retrying...")
+             verticalGridView.post { updateVisibleItemsCount(verticalGridView) }
+             return
+         }
+
+         Log.d(TAG, "LayoutManager type: ${layoutManager.javaClass.simpleName}")
+
+         val itemCount = verticalGridView.adapter?.itemCount ?: 0
+         Log.d(TAG, "Total row count: $itemCount")
+
+         val visibleRowCount = verticalGridView.childCount
+         Log.d(TAG, "Visible row count: $visibleRowCount")
+
+         var fullyVisibleItemsCount = 0
+
+         for (i in 0 until visibleRowCount) {
+             val rowView = verticalGridView.getChildAt(i)
+             Log.d(TAG, "Row $i view type: ${rowView.javaClass.simpleName}")
+
+             // Find the HorizontalGridView within the row
+             val horizontalGridView = findHorizontalGridView(rowView)
+
+             if (horizontalGridView != null) {
+                 val rowAdapter = horizontalGridView.adapter
+                 val rowItemCount = rowAdapter?.itemCount ?: 0
+                 val rowVisibleItemCount = horizontalGridView.childCount
+
+                 var rowFullyVisibleItemsCount = 0
+                 // Count fully visible items in this row
+                 for (j in 0 until rowVisibleItemCount) {
+                     val itemView = horizontalGridView.getChildAt(j)
+                     if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
+                         rowFullyVisibleItemsCount++
+                     }
+                 }
+
+                 fullyVisibleItemsCount += rowFullyVisibleItemsCount
+
+                 Log.d(
+                     TAG,
+                     "Row $i - Total items: $rowItemCount, Fully visible items: $rowFullyVisibleItemsCount"
+                 )
+             } else {
+                 Log.d(TAG, "Row $i - HorizontalGridView not found")
+             }
+         }
+
+         Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
+
+         // Log the height of the VerticalGridView
+         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
+     } */
+
+
     // This method retrieves all visible items, whether fully or partially.
-//    private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
-//        val layoutManager = verticalGridView.layoutManager
-//        if (layoutManager == null) {
-//            Log.e(TAG, "LayoutManager is null, retrying...")
-//            verticalGridView.post { updateVisibleItemsCount(verticalGridView) }
-//            return
-//        }
-//
-//        Log.d(TAG, "LayoutManager type: ${layoutManager.javaClass.simpleName}")
-//
-//        val itemCount = verticalGridView.adapter?.itemCount ?: 0
-//        Log.d(TAG, "Total row count: $itemCount")
-//
-//        val visibleRowCount = verticalGridView.childCount
-//        Log.d(TAG, "Visible row count: $visibleRowCount")
-//
-//        var totalVisibleItemsCount = 0
-//        var fullyVisibleItemsCount = 0
-//
-//        for (i in 0 until visibleRowCount) {
-//            val rowView = verticalGridView.getChildAt(i)
-//            Log.d(TAG, "Row $i view type: ${rowView.javaClass.simpleName}")
-//
-//            // Find the HorizontalGridView within the row
-//            val horizontalGridView = findHorizontalGridView(rowView)
-//
-//            if (horizontalGridView != null) {
-//                val rowAdapter = horizontalGridView.adapter
-//                val rowItemCount = rowAdapter?.itemCount ?: 0
-//                val rowVisibleItemCount = horizontalGridView.childCount
-//
-//                totalVisibleItemsCount += rowVisibleItemCount
-//
-//                // Count fully visible items in this row
-//                for (j in 0 until rowVisibleItemCount) {
-//                    val itemView = horizontalGridView.getChildAt(j)
-//                    if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
-//                        fullyVisibleItemsCount++
-//                    }
-//                }
-//
-//                Log.d(TAG, "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount")
-//            } else {
-//                Log.d(TAG, "Row $i - HorizontalGridView not found")
-//            }
-//        }
-//
-//        Log.d(TAG, "Total visible items across all rows: $totalVisibleItemsCount")
-//        Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
-//
-//        // Log the height of the VerticalGridView
-//        Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
-//    }
+    /* private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
+         val layoutManager = verticalGridView.layoutManager
+         if (layoutManager == null) {
+             Log.e(TAG, "LayoutManager is null, retrying...")
+             verticalGridView.post { updateVisibleItemsCount(verticalGridView) }
+             return
+         }
+
+         Log.d(TAG, "LayoutManager type: ${layoutManager.javaClass.simpleName}")
+
+         val itemCount = verticalGridView.adapter?.itemCount ?: 0
+         Log.d(TAG, "Total row count: $itemCount")
+
+         val visibleRowCount = verticalGridView.childCount
+         Log.d(TAG, "Visible row count: $visibleRowCount")
+
+         var totalVisibleItemsCount = 0
+         var fullyVisibleItemsCount = 0
+
+         for (i in 0 until visibleRowCount) {
+             val rowView = verticalGridView.getChildAt(i)
+             Log.d(TAG, "Row $i view type: ${rowView.javaClass.simpleName}")
+
+             // Find the HorizontalGridView within the row
+             val horizontalGridView = findHorizontalGridView(rowView)
+
+             if (horizontalGridView != null) {
+                 val rowAdapter = horizontalGridView.adapter
+                 val rowItemCount = rowAdapter?.itemCount ?: 0
+                 val rowVisibleItemCount = horizontalGridView.childCount
+
+                 totalVisibleItemsCount += rowVisibleItemCount
+
+                 // Count fully visible items in this row
+                 for (j in 0 until rowVisibleItemCount) {
+                     val itemView = horizontalGridView.getChildAt(j)
+                     if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
+                         fullyVisibleItemsCount++
+                     }
+                 }
+
+                 Log.d(TAG, "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount")
+             } else {
+                 Log.d(TAG, "Row $i - HorizontalGridView not found")
+             }
+         }
+
+         Log.d(TAG, "Total visible items across all rows: $totalVisibleItemsCount")
+         Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
+
+         // Log the height of the VerticalGridView
+         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
+     } */
 
     private fun findHorizontalGridView(view: View): HorizontalGridView? {
         if (view is HorizontalGridView) {
@@ -483,7 +579,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     /* This ensures that we only count an item as fully or partially visible if its entire area
        unction ensures that we only count items that are completely within the bounds of their parent
-       HorizontalGridView.*/
+       HorizontalGridView. */
 
     /* private fun isViewFullyVisible(parent: ViewGroup, view: View): Boolean {
         val parentBounds = Rect()
@@ -514,6 +610,17 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 viewBounds.bottom <= parentBounds.bottom &&
                 viewBounds.width() == view.width &&  // Ensure the full width is visible
                 viewBounds.height() == view.height   // Ensure the full height is visible
+    }
+
+    private fun isViewPartiallyVisible(parent: ViewGroup, view: View): Boolean {
+        val parentBounds = Rect()
+        val viewBounds = Rect()
+
+        parent.getGlobalVisibleRect(parentBounds)
+        view.getGlobalVisibleRect(viewBounds)
+
+        // Check if the view intersects with the parent's bounds but is not fully visible
+        return Rect.intersects(parentBounds, viewBounds) && !isViewFullyVisible(parent, view)
     }
 
     private fun forceLayoutAndUpdateCount(verticalGridView: VerticalGridView) {
