@@ -19,12 +19,11 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.ui.PlayerView
 import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
-import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import java.io.File
-import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,10 +34,8 @@ class ExoPlayerManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     private var exoPlayer: ExoPlayer? = null
-    private var currentPlayingView: WeakReference<NewVideoCardView>? = null
     private var isPlayingVideo = AtomicBoolean(false)
     private var hasVideoEnded = AtomicBoolean(false)
-    private lateinit var tileId: String
     private var currentVideoUrl = ""
     private val simpleCache: SimpleCache by lazy {
         val cacheSize = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.P) {
@@ -62,12 +59,13 @@ class ExoPlayerManager @Inject constructor(
         return exoPlayer!!
     }
 
-    suspend fun playVideo(videoUrl: String, cardView: NewVideoCardView, tileId: String) {
-        this.tileId = tileId
-        currentVideoUrl = videoUrl
-        if (videoUrl.isEmpty()) return
+    fun prepareVideo(videoUrl: String, playerView: PlayerView, onReady: (Boolean) -> Unit, onEnded: () -> Unit) {
+        playerScope.launch {
 
-        withContext(Dispatchers.Main) {
+            if (exoPlayer == null || exoPlayer?.playbackState == Player.STATE_IDLE) {
+                reinitializePlayer()
+            }
+
             try {
                 while (isReleasing.get()) {
                     delay(100)
@@ -77,10 +75,9 @@ class ExoPlayerManager @Inject constructor(
                     releasePlayer()
                 }
 
-                cardView.prepareForVideoPlayback()
-                delay(500)
-
                 val player = getOrCreatePlayer()
+                playerView.player = player
+
                 val upstreamFactory = DefaultDataSource.Factory(context)
                 val cacheDataSourceFactory = CacheDataSource.Factory()
                     .setCache(simpleCache)
@@ -91,28 +88,76 @@ class ExoPlayerManager @Inject constructor(
                 player.setMediaSource(source)
                 player.prepare()
 
-                val surface = cardView.getVideoSurface()
-                if (surface != null && surface.isValid) {
-                    player.setVideoSurface(surface)
-                    cardView.startVideoPlayback(player)
-                    currentPlayingView = WeakReference(cardView)
-                    player.playWhenReady = true
-                    isPlayingVideo.set(true)
-                    hasVideoEnded.set(false)
-                } else {
-                    throw IllegalStateException("Invalid or null surface")
+                player.addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(state: Int) {
+                        when (state) {
+                            Player.STATE_READY -> {
+                                onReady(true)
+                                isPlayingVideo.set(true)
+                                hasVideoEnded.set(false)
+                            }
+                            Player.STATE_ENDED -> {
+                                onEnded()
+                                hasVideoEnded.set(true)
+                                isPlayingVideo.set(false)
+                            }
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        Log.e(TAG, "Player error: ${error.message}", error)
+                        onReady(false)
+                        // Attempt to recover from the error
+                        when (error.errorCode) {
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
+                                player.prepare()
+                            }
+                            PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
+                                player.seekToDefaultPosition()
+                                player.prepare()
+                            }
+                            else -> {
+                                player.stop()
+                                player.clearMediaItems()
+                                player.setMediaItem(MediaItem.fromUri(videoUrl))
+                                player.prepare()
+                            }
+                        }
+                    }
+                })
+
+                currentVideoUrl = videoUrl
+                player.playWhenReady = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error preparing video: ${e.message}")
+                onReady(false)
+            }
+        }
+    }
+
+    fun preloadVideo(videoUrl: String) {
+        playerScope.launch(Dispatchers.IO) {
+            try {
+                val dataSourceFactory = DefaultDataSource.Factory(context)
+                val cacheDataSourceFactory = CacheDataSource.Factory()
+                    .setCache(simpleCache)
+                    .setUpstreamDataSourceFactory(dataSourceFactory)
+                val mediaSource = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
+                    .createMediaSource(MediaItem.fromUri(videoUrl))
+
+                withContext(Dispatchers.Main) {
+                    val player = getOrCreatePlayer()
+                    player.setMediaSource(mediaSource)
+                    player.prepare()
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error playing video: ${e.message}")
-                releasePlayer()
-                cardView.resetPlayerView()
-                throw e
+                Log.e(TAG, "Error preloading video: ${e.message}")
             }
         }
     }
 
     private fun createExoPlayer(): ExoPlayer {
-
         val renderersFactory = DefaultRenderersFactory(context).apply {
             setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             setMediaCodecSelector(createMediaCodecSelector())
@@ -124,10 +169,7 @@ class ExoPlayerManager @Inject constructor(
             .apply {
                 videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                 repeatMode = Player.REPEAT_MODE_OFF
-
-                addListener(playerListener)
             }
-
     }
 
     private fun createMediaCodecSelector(): MediaCodecSelector {
@@ -146,57 +188,6 @@ class ExoPlayerManager @Inject constructor(
                     })
                 } else {
                     decoders.filterNot { it.name == "OMX.MS.AVC.Decoder" }
-                }
-            }
-        }
-    }
-
-    private val playerListener = object : Player.Listener {
-        override fun onPlayerError(error: PlaybackException) {
-            playerScope.launch {
-                Log.e(ExoPlayerManager.TAG, "Player error: ${error.message}", error)
-                currentPlayingView?.get()?.showThumbnail()
-                // Attempt to recover from the error
-                getOrCreatePlayer().let { player ->
-                    when (error.errorCode) {
-                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
-                            // Retry network errors
-                            player.prepare()
-                        }
-
-                        PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
-                            // Retry playback for live streams
-                            player.seekToDefaultPosition()
-                            player.prepare()
-                        }
-
-                        else -> {
-                            // For other errors, reset the player
-                            player.stop()
-                            player.clearMediaItems()
-                            player.setMediaItem(MediaItem.fromUri(currentVideoUrl ?: ""))
-                            player.prepare()
-                        }
-                    }
-                }
-            }
-        }
-
-        override fun onPlaybackStateChanged(state: Int) {
-            playerScope.launch {
-                when (state) {
-                    Player.STATE_IDLE -> Log.d(TAG, "Player is idle")
-                    Player.STATE_BUFFERING -> Log.d(ExoPlayerManager.TAG, "Player is buffering")
-                    Player.STATE_READY -> {
-                        Log.d(TAG, "Player is ready")
-                        currentPlayingView?.get()?.ensureVideoVisible()
-                    }
-
-                    Player.STATE_ENDED -> {
-                        Log.d(TAG, "Player has ended")
-                        handleVideoEnded()
-                    }
                 }
             }
         }
@@ -222,18 +213,6 @@ class ExoPlayerManager @Inject constructor(
         return builder.build()
     }
 
-    private fun handleVideoEnded() {
-        hasVideoEnded.set(true)
-        isPlayingVideo.set(false)
-        currentPlayingView?.get()?.let { view ->
-            view.resetPlayerView()
-            view.shrinkCard()
-            if (!isAndroidVersion9Supported()) {
-                view.onVideoEnded(tileId)
-            }
-        }
-    }
-
     fun setVideoSurface(surface: Surface) {
         playerScope.launch {
             exoPlayer?.setVideoSurface(surface)
@@ -242,24 +221,32 @@ class ExoPlayerManager @Inject constructor(
 
     fun releasePlayer() {
         if (isReleasing.getAndSet(true)) {
-            Log.d(TAG, "ExoPlayer is already being released")
             return
         }
-
         playerScope.launch {
             try {
-                currentPlayingView?.get()?.showThumbnail()
-                currentPlayingView?.get()?.shrinkCard()
-                currentPlayingView?.clear()
-                exoPlayer?.release()
+                exoPlayer?.run {
+                    stop()
+                    clearMediaItems()
+                    release()
+                }
+            } finally {
                 exoPlayer = null
                 isPlayingVideo.set(false)
                 hasVideoEnded.set(false)
-            } finally {
                 isReleasing.set(false)
+                currentVideoUrl = ""
             }
         }
     }
+
+    fun reinitializePlayer() {
+        releasePlayer()
+        exoPlayer = createExoPlayer()
+    }
+
+    fun isPlayerReleased(): Boolean = exoPlayer == null
+
 
     fun onLifecycleDestroy() {
         releasePlayer()

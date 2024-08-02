@@ -9,6 +9,8 @@ import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
+import com.example.leanbackpocmvvm.application.GlideApp
+import com.example.leanbackpocmvvm.views.activity.MainActivity
 
 @UnstableApi
 class CardLayout1(
@@ -16,6 +18,10 @@ class CardLayout1(
     private val exoPlayerManager: ExoPlayerManager,
     private val mainViewModel: MainViewModel
 ) : Presenter() {
+
+    class CustomViewHolder(val cardView: NewVideoCardView) : Presenter.ViewHolder(cardView) {
+        var boundItemId: String? = null
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
         val cardView = NewVideoCardView(parent.context)
@@ -26,33 +32,44 @@ class CardLayout1(
                 setExoPlayerManager(exoPlayerManager)
                 setMainViewModel(mainViewModel)
             }
-        return ViewHolder(cardView)
+        return CustomViewHolder(cardView)
     }
 
     override fun onBindViewHolder(viewHolder: ViewHolder, item: Any?) {
-        val cardView = viewHolder.view as NewVideoCardView
+        val customViewHolder = viewHolder as CustomViewHolder
+        val cardView = customViewHolder.cardView
         val customItem = item as? CustomRowItemX
         if (customItem != null) {
-            cardView.setImage(
-                customItem.contentData.imageUrl,
-                customItem.contentData.width,
-                customItem.contentData.height
-            )
-            cardView.setMainImageDimensions(
-                customItem.contentData.isLandscape,
-                customItem.contentData.isPortrait,
-                customItem.contentData.width,
-                customItem.contentData.height
-            )
-            cardView.tag = customItem.rowItemX.tid
+            // Check if this ViewHolder is already bound to this item
+            if (customViewHolder.boundItemId != customItem.rowItemX.tid) {
+                customViewHolder.boundItemId = customItem.rowItemX.tid
+                cardView.setImage(
+                    customItem.contentData.imageUrl,
+                    customItem.contentData.width,
+                    customItem.contentData.height
+                )
+                cardView.setMainImageDimensions(
+                    customItem.contentData.isLandscape,
+                    customItem.contentData.isPortrait,
+                    customItem.contentData.width,
+                    customItem.contentData.height
+                )
+                cardView.tag = customItem.rowItemX.tid
+            }
         }
     }
 
     override fun onUnbindViewHolder(viewHolder: ViewHolder) {
-        val cardView = viewHolder.view as NewVideoCardView
-        cardView.stopVideoPlayback()
-        mainViewModel.stopVideoPlayback()
-        //cardView.updateVideoPlaybackState(VideoPlaybackState.Stopped)
-        // No need to do anything here, as video playback is managed by ViewModel
+        val customViewHolder = viewHolder as CustomViewHolder
+        customViewHolder.boundItemId = null
+        val cardView = customViewHolder.cardView
+        cardView.resetCardState()
+        try {
+            GlideApp.with(cardView.context).clear(cardView)
+        } catch (e: IllegalArgumentException) {
+             //Activity was already destroyed, ignore
+        }
+        // If you want to stop video playback here as well, uncomment the next line
+
     }
 }
