@@ -7,6 +7,7 @@ import androidx.media3.common.util.UnstableApi
 import com.bumptech.glide.Glide
 import com.example.leanbackpocmvvm.views.fragment.MainFragment
 import com.example.leanbackpocmvvm.R
+import com.example.leanbackpocmvvm.application.AvLeanback
 import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.AndroidEntryPoint
@@ -40,12 +41,13 @@ class MainActivity : FragmentActivity() {
         isActivityDestroyed = true
 
         // Clear all fragments
-        val fragment = supportFragmentManager.findFragmentById(R.id.fragment_container)
-        if (fragment is MainFragment) {
-            fragment.onDestroy()
-        }
+        AvLeanback.forceStopApp(applicationContext)
 
         super.onDestroy()
+    }
+
+    override fun onBackPressed() {
+        finishAndRemoveTask()
     }
 
     override fun onResume() {

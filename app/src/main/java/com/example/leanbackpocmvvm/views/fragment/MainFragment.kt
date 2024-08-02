@@ -3,6 +3,8 @@ package com.example.leanbackpocmvvm.views.fragment
 import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -280,7 +282,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 super.onScrolled(recyclerView, dx, dy)
                 val visibleItemCount = verticalGridView.childCount
-                Log.e(TAG, "visibleItemCount $visibleItemCount")
+                Log.d(TAG, "visibleItemCount $visibleItemCount")
 
                 preloadVisibleItems()
             }
@@ -355,12 +357,21 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun setupBackPressHandler() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                isFragmentDestroyed = true
-                viewModel.stopAutoScroll()
-                stopVideoPlayback()
-                requireActivity().finish()
+                cleanupAndExit()
             }
         })
+    }
+
+    private fun cleanupAndExit() {
+        viewModel.stopAutoScroll()
+        viewModel.stopVideoPlayback()
+        exoPlayerManager.releasePlayer()
+        unregisterNetworkReceiver()
+
+        // Use Handler to post the finish call to ensure all cleanup is done
+        Handler(Looper.getMainLooper()).post {
+            requireActivity().finishAndRemoveTask()
+        }
     }
 
     override fun onPause() {

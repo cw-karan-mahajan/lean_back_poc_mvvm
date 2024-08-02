@@ -225,12 +225,17 @@ class ExoPlayerManager @Inject constructor(
         }
         playerScope.launch {
             try {
-                exoPlayer?.release()
+                exoPlayer?.run {
+                    stop()
+                    clearMediaItems()
+                    release()
+                }
             } finally {
                 exoPlayer = null
                 isPlayingVideo.set(false)
                 hasVideoEnded.set(false)
                 isReleasing.set(false)
+                currentVideoUrl = ""
             }
         }
     }

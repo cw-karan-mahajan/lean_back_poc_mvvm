@@ -1,5 +1,6 @@
 package com.example.leanbackpocmvvm.application
 
+import android.app.ActivityManager
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
@@ -18,6 +19,13 @@ class AvLeanback : Application(), ComponentCallbacks2 {
     private var idleHandler: Handler? = null
     private lateinit var glideBuilder: GlideBuilder
     private var currentIdleStage = 0
+
+    companion object {
+        fun forceStopApp(context: Context) {
+            val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            activityManager.killBackgroundProcesses(context.packageName)
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()

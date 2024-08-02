@@ -233,8 +233,16 @@ class MainViewModel @Inject constructor(
     }
 
     fun stopVideoPlayback() {
-        exoPlayerManager.releasePlayer()
-        _videoPlaybackState.value = VideoPlaybackState.Stopped
+        viewModelScope.launch(Dispatchers.Main) {
+            exoPlayerManager.releasePlayer()
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            currentlyPlayingVideoTileId?.let { tileId ->
+                _resetCardCommand.value = tileId
+            }
+            isVideoPlaying = false
+            currentlyPlayingVideoTileId = null
+            cancelPendingPlayback()
+        }
     }
 
     fun onItemClicked(item: CustomRowItemX) {
