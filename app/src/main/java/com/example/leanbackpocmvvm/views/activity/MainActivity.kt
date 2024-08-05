@@ -17,6 +17,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
     private var isActivityDestroyed = false
+
     @Inject
     lateinit var exoPlayerManager: ExoPlayerManager
 
@@ -53,14 +54,14 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         //if (exoPlayerManager.isPlayerReleased()) {
-            exoPlayerManager.reinitializePlayer()
-       // }
+        exoPlayerManager.reinitializePlayer()
+        // }
     }
 
     override fun onPause() {
         super.onPause()
         //if (!exoPlayerManager.isPlayerReleased()) {
-            exoPlayerManager.releasePlayer()
+        exoPlayerManager.releasePlayer()
         //}
     }
 }

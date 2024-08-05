@@ -16,6 +16,7 @@ import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.utils.dpToPx
 import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
@@ -40,6 +41,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     var mTileId: String? = null
     private var isViewAttached = false
     private var currentImageUrl: String? = null
+    var customItem: CustomRowItemX? = null
 
     init {
         layoutParams = ViewGroup.LayoutParams(

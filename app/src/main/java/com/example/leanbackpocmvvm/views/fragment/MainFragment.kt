@@ -93,7 +93,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         observeViewModel()
         setupBackPressHandler()
         view.post { setupScrollListener(view) }
-
     }
 
     private fun setUI() {
@@ -127,6 +126,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.playVideoCommand.observe(viewLifecycleOwner) { command ->
             val cardView = view?.findViewWithTag<NewVideoCardView>(command.tileId)
             cardView?.let { prepareVideoPlayback(it, command.videoUrl, command.tileId) }
+            // Log the current set of played video tile IDs
+            Log.d(TAG, "Current played video tile IDs: ${viewModel.playedVideoTileIds.joinToString()}")
         }
 
         viewModel.autoScrollCommand.observe(viewLifecycleOwner) { command ->
@@ -345,7 +346,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             }
         })
 
-        // Perform initial count after a delay
+        // This method ensures we get an initial count as soon as possible without an arbitrary delay,
+        // and then updates the count during scrolling. It's more efficient and avoids potential
+        // redundancy while still ensuring we have an accurate count from the start.
         verticalGridView.postDelayed({
             updateVisibleItemsCount(verticalGridView)
         }, 500) // 500ms delay
@@ -391,15 +394,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                     val itemView = horizontalGridView.getChildAt(j)
                     if (itemView != null) {
                         when {
-                            isViewFullyVisible(
-                                horizontalGridView,
-                                itemView
-                            ) -> rowFullyVisibleItemsCount++
-
-                            isViewPartiallyVisible(
-                                horizontalGridView,
-                                itemView
-                            ) -> rowPartiallyVisibleItemsCount++
+                            isViewFullyVisible(horizontalGridView, itemView) -> {
+                                rowFullyVisibleItemsCount++
+                                val cardView = itemView as? NewVideoCardView
+                                cardView?.customItem?.rowItemX?.tid?.let { tileId ->
+                                    viewModel.addFullyVisibleTileId(tileId)
+                                }
+                            }
+                            isViewPartiallyVisible(horizontalGridView, itemView) -> rowPartiallyVisibleItemsCount++
                         }
                     }
                     Log.d(

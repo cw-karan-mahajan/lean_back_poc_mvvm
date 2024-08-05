@@ -55,6 +55,7 @@ class CardLayout1(
                     customItem.contentData.height
                 )
                 cardView.tag = customItem.rowItemX.tid
+                cardView.customItem = customItem
             }
         }
     }
