@@ -126,6 +126,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.playVideoCommand.observe(viewLifecycleOwner) { command ->
             val cardView = view?.findViewWithTag<NewVideoCardView>(command.tileId)
             cardView?.let { prepareVideoPlayback(it, command.videoUrl, command.tileId) }
+            // Log the current set of played video tile IDs
+            Log.d(TAG, "Current played video tile IDs: ${viewModel.playedVideoTileIds.joinToString()}")
         }
 
         viewModel.autoScrollCommand.observe(viewLifecycleOwner) { command ->
@@ -392,15 +394,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                     val itemView = horizontalGridView.getChildAt(j)
                     if (itemView != null) {
                         when {
-                            isViewFullyVisible(
-                                horizontalGridView,
-                                itemView
-                            ) -> rowFullyVisibleItemsCount++
-
-                            isViewPartiallyVisible(
-                                horizontalGridView,
-                                itemView
-                            ) -> rowPartiallyVisibleItemsCount++
+                            isViewFullyVisible(horizontalGridView, itemView) -> {
+                                rowFullyVisibleItemsCount++
+                                val cardView = itemView as? NewVideoCardView
+                                cardView?.customItem?.rowItemX?.tid?.let { tileId ->
+                                    viewModel.addFullyVisibleTileId(tileId)
+                                }
+                            }
+                            isViewPartiallyVisible(horizontalGridView, itemView) -> rowPartiallyVisibleItemsCount++
                         }
                     }
                     Log.d(

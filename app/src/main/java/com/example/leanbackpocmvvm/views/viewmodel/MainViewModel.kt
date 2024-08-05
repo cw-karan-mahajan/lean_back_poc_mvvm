@@ -75,6 +75,11 @@ class MainViewModel @Inject constructor(
     private val VIDEO_START_DELAY = 5000L // 5 seconds delay before playing video
     private val USER_IDLE_DELAY = 5000L // 5 seconds
     var mRowsAdapter: ArrayObjectAdapter? = null
+    private val _fullyVisibleTileIds = mutableSetOf<String>()
+
+    private val _playedVideoTileIds = mutableSetOf<String>()
+    val playedVideoTileIds: Set<String> = _playedVideoTileIds
+
 
     fun loadData() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -226,6 +231,7 @@ class MainViewModel @Inject constructor(
 
     private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
         item.rowItemX.videoUrl?.let { videoUrl ->
+            addPlayedVideoTileId(item.rowItemX.tid)
             _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
             currentlyPlayingVideoTileId = item.rowItemX.tid
             _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid)
@@ -255,6 +261,20 @@ class MainViewModel @Inject constructor(
 
     fun onVideoEnded(tileId: String) {
         handleVideoEnded(tileId)
+    }
+
+    fun addFullyVisibleTileId(tileId: String) {
+        if (_fullyVisibleTileIds.add(tileId)) {
+            // The add() method returns true if the element was added to the set
+            Log.d(TAG, "Added new fully visible tile ID: $tileId")
+        }
+    }
+
+    private fun addPlayedVideoTileId(tileId: String) {
+        if (_playedVideoTileIds.add(tileId)) {
+            // The add() method returns true if the element was added to the set
+            Log.d(TAG, "Added new played video tile ID: $tileId")
+        }
     }
 
     private fun handleVideoEnded(tileId: String) {
