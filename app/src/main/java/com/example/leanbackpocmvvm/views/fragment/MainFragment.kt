@@ -93,7 +93,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         observeViewModel()
         setupBackPressHandler()
         view.post { setupScrollListener(view) }
-
     }
 
     private fun setUI() {
@@ -345,7 +344,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             }
         })
 
-        // Perform initial count after a delay
+        // This method ensures we get an initial count as soon as possible without an arbitrary delay,
+        // and then updates the count during scrolling. It's more efficient and avoids potential
+        // redundancy while still ensuring we have an accurate count from the start.
         verticalGridView.postDelayed({
             updateVisibleItemsCount(verticalGridView)
         }, 500) // 500ms delay
