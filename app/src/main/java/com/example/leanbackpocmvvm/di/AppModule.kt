@@ -69,7 +69,7 @@ object AppModule {
         return OkHttpClient.Builder()
             .hostnameVerifier { _, _ -> true }
            // .addInterceptor(headerInterceptor)
-            //.addInterceptor(loggingInterceptor)
+            .addInterceptor(loggingInterceptor)
             .build()
     }
 

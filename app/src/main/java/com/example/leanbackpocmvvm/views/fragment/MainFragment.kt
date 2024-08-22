@@ -191,7 +191,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                     if (cardView != null) {
                         val rowIndex = rowsAdapter.indexOf(row)
                         val itemIndex = findItemIndex(row as? ListRow, item)
-                        //viewModel.onItemFocused(item, rowIndex, itemIndex)
+                        viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }
 
