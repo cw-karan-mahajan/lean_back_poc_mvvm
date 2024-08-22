@@ -1,16 +1,22 @@
 package com.example.leanbackpocmvvm.views.customview
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.util.Log
 import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.ProgressBar
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.utils.dpToPx
@@ -30,6 +36,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     var isVideoPlaying = false
     private val focusOverlay: View
     private var thumbnailOverlay: FrameLayout
+    private val loaderView: ProgressBar
 
     private var originalWidth: Int = 0
     private var originalHeight: Int = 0
@@ -40,7 +47,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private lateinit var mainViewModel: MainViewModel
     var mTileId: String? = null
     private var isViewAttached = false
-    private var currentImageUrl: String? = null
     var customItem: CustomRowItemX? = null
 
     init {
@@ -100,6 +106,17 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         }
         innerLayout.addView(focusOverlay)
 
+        loaderView = ProgressBar(context).apply {
+            layoutParams = LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = android.view.Gravity.CENTER
+            }
+            visibility = View.GONE
+        }
+        innerLayout.addView(loaderView)
+
         addView(innerLayout)
         clipChildren = false
 
@@ -116,7 +133,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         isFocusableInTouchMode = true
 
         setOnFocusChangeListener { _, hasFocus ->
-            Log.d(TAG, "Focus changed: $hasFocus")
             updateFocusOverlayVisibility(hasFocus)
             if (hasFocus) {
                 if (isVideoPlaying) {
@@ -157,31 +173,101 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         this.mainViewModel = viewModel
     }
 
-    fun setImage(imageUrl: String, width: Int, height: Int) {
+    fun setImage(imageUrl: String?, width: Int, height: Int, isAdImage: Boolean = false) {
         GlideApp.with(context).clear(thumbnailImageView)
         GlideApp.with(context).clear(posterImageView)
         thumbnailImageView.setImageDrawable(null)
         posterImageView.setImageDrawable(null)
+        val mImageUrl = imageUrl?.replace("http://", "https://") ?: ""
 
-        currentImageUrl = imageUrl.replace("http://", "https://")
-        loadCurrentImage(width, height)
-    }
-
-    private fun loadCurrentImage(width: Int = -1, height: Int = -1) {
-        if (isViewAttached && currentImageUrl != null) {
-            (context as? MainActivity)?.safelyUseGlide {
-                val requestBuilder = GlideApp.with(context)
-                    .load(currentImageUrl)
-                    .centerCrop()
-
-                if (width > 0 && height > 0) {
-                    requestBuilder.override(width, height)
-                }
-
-                requestBuilder.into(thumbnailImageView)
-                requestBuilder.into(posterImageView)
+        if (isAdImage) {
+            if (imageUrl == null) {
+                showLoader()
+            } else {
+                Log.d(TAG, "isAdImage $isAdImage and $mImageUrl")
+                loadAdImage(mImageUrl, width, height)
+            }
+        } else {
+            hideLoader()
+            if (imageUrl != null) {
+                loadRegularImage(mImageUrl, width, height)
+            } else {
+                // Set a placeholder image here if needed
             }
         }
+    }
+
+    private fun loadCurrentImage() {
+        customItem?.let { item ->
+            val isAdImage = item.rowItemX.adsServer != null
+            val imageUrl = if (isAdImage) item.rowItemX.adImageUrl else item.contentData.imageUrl
+            setImage(
+                imageUrl,
+                item.contentData.width,
+                item.contentData.height,
+                isAdImage
+            )
+        }
+    }
+
+    private fun loadAdImage(imageUrl: String, width: Int, height: Int) {
+        if (isViewAttached) {
+            showLoader()
+            (context as? MainActivity)?.safelyUseGlide {
+                GlideApp.with(context)
+                    .load(imageUrl)
+                    .centerCrop()
+                    .override(width, height)
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<Drawable>?,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            hideLoader()
+                            // Handle load failure (error placeholder)
+                            return false
+                        }
+
+                        override fun onResourceReady(
+                            resource: Drawable?,
+                            model: Any?,
+                            target: Target<Drawable>?,
+                            dataSource: DataSource?,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            hideLoader()
+                            return false
+                        }
+                    })
+                    .into(thumbnailImageView)
+            }
+        }
+    }
+
+    private fun loadRegularImage(imageUrl: String, width: Int, height: Int) {
+        if (isViewAttached) {
+            (context as? MainActivity)?.safelyUseGlide {
+                GlideApp.with(context)
+                    .load(imageUrl)
+                    .centerCrop()
+                    .override(width, height)
+                    .into(thumbnailImageView)
+            }
+        }
+    }
+
+    private fun showLoader() {
+        loaderView.visibility = View.VISIBLE
+        thumbnailImageView.visibility = View.GONE
+        posterImageView.visibility = View.GONE
+    }
+
+    private fun hideLoader() {
+        loaderView.visibility = View.GONE
+        thumbnailImageView.visibility = View.VISIBLE
+        posterImageView.visibility = View.GONE
     }
 
     fun setExoPlayerManager(manager: ExoPlayerManager) {
@@ -263,7 +349,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         updateFocusOverlayVisibility(isFocused)
     }
 
-    fun stretchCard() {
+    private fun stretchCard() {
         lifecycleOwner.lifecycleScope.launch {
             resizeCard(true)
         }
@@ -281,9 +367,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailOverlay.visibility = View.GONE
+        loaderView.visibility = View.GONE
     }
 
-    fun updateFocusOverlayVisibility(hasFocus: Boolean) {
+    private fun updateFocusOverlayVisibility(hasFocus: Boolean) {
         val shouldBeVisible = hasFocus || isVideoPlaying
         focusOverlay.visibility = if (shouldBeVisible) View.VISIBLE else View.INVISIBLE
     }
@@ -294,6 +381,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailOverlay.visibility = View.GONE
+        loaderView.visibility = View.GONE
         shrinkCard()
         updateFocusOverlayVisibility(isFocused)
     }

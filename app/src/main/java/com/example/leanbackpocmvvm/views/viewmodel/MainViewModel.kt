@@ -2,32 +2,43 @@ package com.example.leanbackpocmvvm.views.viewmodel
 
 import android.util.Log
 import androidx.annotation.OptIn
-import androidx.lifecycle.*
-import androidx.leanback.widget.*
+import androidx.leanback.widget.ArrayObjectAdapter
+import androidx.leanback.widget.ListRow
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
 import com.example.leanbackpocmvvm.core.Resource
+import com.example.leanbackpocmvvm.models.AdResponse
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
+import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
-import com.example.leanbackpocmvvm.views.activity.MainActivity
-import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @UnstableApi
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: MainRepository,
-    private val apiRepository1: MainRepository1,
+   // private val apiRepository1: MainRepository1,
+    private val adRepository: AdRepository,
     private val exoPlayerManager: ExoPlayerManager,
+    private val gson: Gson
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -82,32 +93,59 @@ class MainViewModel @Inject constructor(
 
 
     fun loadData() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
                 val myData2 = repository.getMyData()
+                val adUrls = myData2.rows
+                    .filter { it.rowLayout == "landscape" && it.rowHeader == "bannerAd" }
+                    .flatMap { it.rowItems }
+                    .mapNotNull { it.adsServer }
+
+                val adResponses = adRepository.fetchAds(adUrls)
+
+                updateDataWithAds(myData2, adResponses)
+
                 _uiState.value = UiState.Success(myData2)
             } catch (e: Exception) {
-                _toastMessage.postValue("Error loading data: ${e.message}")
+                _uiState.value = UiState.Error("Error loading data: ${e.message}")
             }
         }
     }
 
-    fun fetchData() {
-        viewModelScope.launch {
-            apiRepository1.fetchList().distinctUntilChanged().collect { response ->
-                when (response) {
-                    is Resource.Success -> {
-                        _uiState.value = UiState.Success(response.data)
-                    }
-
-                    is Resource.Error -> {
-                        _uiState.value = UiState.Error(response.message)
-                        _toastMessage.postValue("Error loading data: ${response.message}")
+    private fun updateDataWithAds(data: MyData2, adResponses: List<Pair<String, Resource<AdResponse>>>) {
+        data.rows.forEach { row ->
+            if (row.rowLayout == "landscape" && row.rowHeader == "bannerAd") {
+                row.rowItems.forEach { item ->
+                    item.adsServer?.let { adUrl ->
+                        val adResponse = adResponses.find { it.first == adUrl }?.second
+                        if (adResponse is Resource.Success) {
+                            val imageUrl = adResponse.data.seatbid
+                                ?.firstOrNull()?.bid
+                                ?.firstOrNull()?.parsedImageUrl
+                            item.adImageUrl = imageUrl
+                        }
                     }
                 }
             }
         }
     }
+
+//    fun fetchData() {
+//        viewModelScope.launch {
+//            apiRepository1.fetchList().distinctUntilChanged().collect { response ->
+//                when (response) {
+//                    is Resource.Success -> {
+//                        _uiState.value = UiState.Success(response.data)
+//                    }
+//
+//                    is Resource.Error -> {
+//                        _uiState.value = UiState.Error(response.message)
+//                        _toastMessage.postValue("Error loading data: ${response.message}")
+//                    }
+//                }
+//            }
+//        }
+//    }
 
     fun setNetworkStatus(isConnected: Boolean) {
         if (isConnected) {

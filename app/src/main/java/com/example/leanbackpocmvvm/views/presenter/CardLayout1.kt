@@ -43,10 +43,15 @@ class CardLayout1(
             // Check if this ViewHolder is already bound to this item
             if (customViewHolder.boundItemId != customItem.rowItemX.tid) {
                 customViewHolder.boundItemId = customItem.rowItemX.tid
+
+                val isAdImage = customItem.rowItemX.adsServer != null
+                val imageUrl = if (isAdImage) customItem.rowItemX.adImageUrl else customItem.contentData.imageUrl
+
                 cardView.setImage(
-                    customItem.contentData.imageUrl,
+                    imageUrl,
                     customItem.contentData.width,
-                    customItem.contentData.height
+                    customItem.contentData.height,
+                    isAdImage
                 )
                 cardView.setMainImageDimensions(
                     customItem.contentData.isLandscape,
@@ -68,9 +73,7 @@ class CardLayout1(
         try {
             GlideApp.with(cardView.context).clear(cardView)
         } catch (e: IllegalArgumentException) {
-             //Activity was already destroyed, ignore
+            //Activity was already destroyed, ignore
         }
-        // If you want to stop video playback here as well, uncomment the next line
-
     }
 }
