@@ -12,9 +12,8 @@ import javax.inject.Singleton
 
 @Singleton
 interface MainRepository1 {
-    fun fetchList(): Flow<Resource<MyData2>>
+    fun fetchList(baseUrl: String, headers: Map<String, String> = emptyMap()): Flow<Resource<MyData2>>
 }
-
 
 class MainRepository @Inject constructor(
     @ApplicationContext private val context: Context,

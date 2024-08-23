@@ -35,10 +35,9 @@ import javax.inject.Inject
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: MainRepository,
-   // private val apiRepository1: MainRepository1,
+    private val mainRepository1: MainRepository1,
     private val adRepository: AdRepository,
-    private val exoPlayerManager: ExoPlayerManager,
-    private val gson: Gson
+    private val exoPlayerManager: ExoPlayerManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -130,22 +129,22 @@ class MainViewModel @Inject constructor(
         }
     }
 
-//    fun fetchData() {
-//        viewModelScope.launch {
-//            apiRepository1.fetchList().distinctUntilChanged().collect { response ->
-//                when (response) {
-//                    is Resource.Success -> {
-//                        _uiState.value = UiState.Success(response.data)
-//                    }
-//
-//                    is Resource.Error -> {
-//                        _uiState.value = UiState.Error(response.message)
-//                        _toastMessage.postValue("Error loading data: ${response.message}")
-//                    }
-//                }
-//            }
-//        }
-//    }
+    fun fetchData(baseUrl: String, headers: Map<String, String> = emptyMap()) {
+        viewModelScope.launch {
+            mainRepository1.fetchList(baseUrl, headers).distinctUntilChanged().collect { response ->
+                when (response) {
+                    is Resource.Success -> {
+                        _uiState.value = UiState.Success(response.data)
+                    }
+
+                    is Resource.Error -> {
+                        _uiState.value = UiState.Error(response.message)
+                        _toastMessage.postValue("Error loading data: ${response.message}")
+                    }
+                }
+            }
+        }
+    }
 
     fun setNetworkStatus(isConnected: Boolean) {
         if (isConnected) {
