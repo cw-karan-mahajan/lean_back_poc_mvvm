@@ -191,10 +191,11 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                     if (cardView != null) {
                         val rowIndex = rowsAdapter.indexOf(row)
                         val itemIndex = findItemIndex(row as? ListRow, item)
-                        viewModel.onItemFocused(item, rowIndex, itemIndex)
+                        Log.d(TAG, "OnUserFocus")
+                        viewModel.onUserFocus(item)
+                        //viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }
-
                 else -> {
                     viewModel.stopAutoScroll()
                     stopVideoPlayback()
@@ -398,7 +399,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                                 rowFullyVisibleItemsCount++
                                 val cardView = itemView as? NewVideoCardView
                                 cardView?.customItem?.rowItemX?.tid?.let { tileId ->
-                                    viewModel.addFullyVisibleTileId(tileId)
+                                    viewModel.addFullyVisibleTileId(tileId, cardView.customItem)
                                 }
                             }
                             isViewPartiallyVisible(horizontalGridView, itemView) -> rowPartiallyVisibleItemsCount++

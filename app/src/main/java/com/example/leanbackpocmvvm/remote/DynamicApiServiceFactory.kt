@@ -1,5 +1,6 @@
 package com.example.leanbackpocmvvm.remote
 
+import android.net.Uri
 import android.util.Log
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -13,7 +14,8 @@ class DynamicApiServiceFactory @Inject constructor(
 ) {
     private val cachedRetrofits = mutableMapOf<String, Retrofit>()
 
-    fun <T> createService(serviceClass: Class<T>, baseUrl: String, headers: Map<String, String> = emptyMap()): T {
+    fun <T> createService(serviceClass: Class<T>, url: String, headers: Map<String, String> = emptyMap()): T {
+        val baseUrl = extractBaseUrl(url)
         val cacheKey = "$baseUrl:${headers.hashCode()}"
 
         val retrofit = cachedRetrofits.getOrPut(cacheKey) {
@@ -42,5 +44,20 @@ class DynamicApiServiceFactory @Inject constructor(
         }
 
         return retrofit.create(serviceClass)
+    }
+
+    private fun extractBaseUrl(url: String): String {
+        val uri = Uri.parse(url)
+        return "${uri.scheme}://${uri.host}${if (uri.port != -1) ":${uri.port}" else ""}/"
+    }
+
+    fun extractPath(url: String): String {
+        val uri = Uri.parse(url)
+        return uri.path ?: ""
+    }
+
+    fun extractQueryParams(url: String): Map<String, String> {
+        val uri = Uri.parse(url)
+        return uri.queryParameterNames.associateWith { uri.getQueryParameter(it) ?: "" }
     }
 }

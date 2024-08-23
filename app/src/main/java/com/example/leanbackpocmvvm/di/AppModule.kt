@@ -103,17 +103,6 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideAdApiService(retrofitBuilder: Retrofit.Builder, okHttpClientBuilder: OkHttpClient.Builder): AdApiService {
-        val client = okHttpClientBuilder.build()
-        return retrofitBuilder
-            .baseUrl("https://tiles.springserve.com/nv/")
-            .client(client)
-            .build()
-            .create(AdApiService::class.java)
-    }
-
-    @Provides
-    @Singleton
     fun provideAdRepository(
         dynamicApiServiceFactory: DynamicApiServiceFactory,
         networkConnectivity: NetworkConnectivity,

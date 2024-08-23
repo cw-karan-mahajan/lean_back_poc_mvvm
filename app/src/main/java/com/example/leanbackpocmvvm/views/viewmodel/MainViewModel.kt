@@ -17,18 +17,14 @@ import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
-import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import retrofit2.Response
+import java.util.Collections
 import javax.inject.Inject
 
 @UnstableApi
@@ -62,7 +58,6 @@ class MainViewModel @Inject constructor(
     val resetCardCommand: LiveData<String> = _resetCardCommand
 
     private val _videoPlaybackState = MutableLiveData<VideoPlaybackState>()
-    val videoPlaybackState: LiveData<VideoPlaybackState> = _videoPlaybackState
 
     private val _preloadVideoCommand = MutableLiveData<PreloadVideoCommand>()
     val preloadVideoCommand: LiveData<PreloadVideoCommand> = _preloadVideoCommand
@@ -85,11 +80,14 @@ class MainViewModel @Inject constructor(
     private val VIDEO_START_DELAY = 5000L // 5 seconds delay before playing video
     private val USER_IDLE_DELAY = 5000L // 5 seconds
     var mRowsAdapter: ArrayObjectAdapter? = null
-    private val _fullyVisibleTileIds = mutableSetOf<String>()
 
-    private val _playedVideoTileIds = mutableSetOf<String>()
+    private val _playedVideoTileIds = Collections.synchronizedSet(mutableSetOf<String>())
     val playedVideoTileIds: Set<String> = _playedVideoTileIds
 
+    private val _fullyVisibleTileIds = Collections.synchronizedSet(mutableSetOf<String>())
+    private val _pendingImpressions = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
+    private val _trackedImpressionTileIds = Collections.synchronizedSet(mutableSetOf<String>())
+    private var impressionTrackingJob: Job? = null
 
     fun loadData() {
         viewModelScope.launch {
@@ -111,7 +109,10 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun updateDataWithAds(data: MyData2, adResponses: List<Pair<String, Resource<AdResponse>>>) {
+    private fun updateDataWithAds(
+        data: MyData2,
+        adResponses: List<Pair<String, Resource<AdResponse>>>
+    ) {
         data.rows.forEach { row ->
             if (row.rowLayout == "landscape" && row.rowHeader == "bannerAd") {
                 row.rowItems.forEach { item ->
@@ -136,7 +137,6 @@ class MainViewModel @Inject constructor(
                     is Resource.Success -> {
                         _uiState.value = UiState.Success(response.data)
                     }
-
                     is Resource.Error -> {
                         _uiState.value = UiState.Error(response.message)
                         _toastMessage.postValue("Error loading data: ${response.message}")
@@ -168,6 +168,8 @@ class MainViewModel @Inject constructor(
             }
 
             isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
+
+
 
             if (isCurrentRowAutoScrollable) {
                 if (item.rowItemX.videoUrl != null) {
@@ -300,16 +302,39 @@ class MainViewModel @Inject constructor(
         handleVideoEnded(tileId)
     }
 
-    fun addFullyVisibleTileId(tileId: String) {
-        if (_fullyVisibleTileIds.add(tileId)) {
-            // The add() method returns true if the element was added to the set
-            Log.d(TAG, "Added new fully visible tile ID: $tileId")
+    fun onUserFocus(item: CustomRowItemX) {
+        // Check if this tile's impression hasn't been tracked yet
+        if (_trackedImpressionTileIds.add(item.rowItemX.tid)) {
+            item.rowItemX.adsServer?.let { adsServerUrl ->
+                Log.d(TAG, "Tracking impression for focused tile: ${item.rowItemX.tid}")
+                val impTrackerUrls = adRepository.getImpressionTrackerUrls(adsServerUrl)
+                impTrackerUrls.forEach { impTrackerUrl ->
+                    Log.d(TAG, "impTrackerUrl: $impTrackerUrl")
+                    _pendingImpressions.add(item.rowItemX.tid to impTrackerUrl)
+                }
+                if (impTrackerUrls.isNotEmpty()) {
+                    scheduleImpressionTracking()
+                }
+            }
+        }
+    }
+
+    fun addFullyVisibleTileId(tileId: String, customItem: CustomRowItemX?) {
+        if (_fullyVisibleTileIds.add(tileId) && _trackedImpressionTileIds.add(tileId)) {
+            customItem?.rowItemX?.adsServer?.let { adsServerUrl ->
+                Log.d(TAG, "Added new fully visible tile ID: $tileId")
+                // Get the impression tracker URLs for this ads_server URL
+                val impTrackerUrls = adRepository.getImpressionTrackerUrls(adsServerUrl)
+                impTrackerUrls.forEach { impTrackerUrl ->
+                    _pendingImpressions.add(tileId to impTrackerUrl)
+                }
+                scheduleImpressionTracking()
+            }
         }
     }
 
     private fun addPlayedVideoTileId(tileId: String) {
         if (_playedVideoTileIds.add(tileId)) {
-            // The add() method returns true if the element was added to the set
             Log.d(TAG, "Added new played video tile ID: $tileId")
         }
     }
@@ -362,12 +387,49 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private fun scheduleImpressionTracking() {
+        if (impressionTrackingJob?.isActive != true) {
+            impressionTrackingJob = viewModelScope.launch {
+                delay(100) // Small delay to batch impressions
+                trackPendingImpressions()
+            }
+        }
+    }
+
+    private suspend fun trackPendingImpressions() {
+        val impressions = _pendingImpressions.toList()
+        _pendingImpressions.clear()
+
+        if (impressions.isNotEmpty()) {
+            try {
+                val results = adRepository.trackImpressions(impressions)
+                results.forEach { (tileId, result) ->
+                    when (result) {
+                        is Resource.Success -> {
+                            Log.d(TAG, "Impression tracked successfully for tile: $impressions")
+                        }
+                        is Resource.Error -> {
+                            Log.e(TAG, "Failed to track impression for tile: $tileId. Error: ${result.message}")
+                            // If tracking failed, we might want to re-add to pending impressions
+                            _pendingImpressions.add(tileId to impressions.first { it.first == tileId }.second)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error tracking impressions: ${e.message}", e)
+                // Re-add all impressions back to the pending list
+                _pendingImpressions.addAll(impressions)
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         viewModelScope.cancel()
         cancelPendingPlayback()
         exoPlayerManager.releasePlayer()
         stopAutoScroll()
+        impressionTrackingJob?.cancel()
     }
 
     companion object {

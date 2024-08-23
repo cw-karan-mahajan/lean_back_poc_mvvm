@@ -184,7 +184,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             if (imageUrl == null) {
                 showLoader()
             } else {
-                Log.d(TAG, "isAdImage $isAdImage and $mImageUrl")
                 loadAdImage(mImageUrl, width, height)
             }
         } else {
@@ -287,7 +286,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun prepareForVideoPlayback() {
-        Log.d(TAG, "Preparing for video playback")
         videoPlaceholder.visibility = View.VISIBLE
         thumbnailImageView.visibility = View.GONE
         posterImageView.visibility = View.GONE
@@ -308,7 +306,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun startVideoPlayback() {
-        Log.d(TAG, "startVideoPlayback called")
         isVideoPlaying = true
         stretchCard()
         updateFocusOverlayVisibility(true)
