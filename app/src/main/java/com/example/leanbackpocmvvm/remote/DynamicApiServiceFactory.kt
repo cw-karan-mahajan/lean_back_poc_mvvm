@@ -38,7 +38,7 @@ class DynamicApiServiceFactory @Inject constructor(
                     .client(client)
                     .build()
             } catch (e: IllegalArgumentException) {
-                Log.e("DynamicApiServiceFactory", "Error creating Retrofit instance: ${e.message}", e)
+                Log.e("DynamicApiService", "Error creating Retrofit instance: ${e.message}", e)
                 throw e
             }
         }

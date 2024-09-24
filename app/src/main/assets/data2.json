@@ -81,13 +81,14 @@
           "tileHeight": "313"
         },
         {
-          "tileType": "typeAD",
+          "tileType": "typeAdsVideo",
           "tid": "5a54a0a55f88c535a80e0040",
           "title": "JioCinema_ToontasticWinterCarnival_1Jan2024_MB_Prime | Ad",
           "poster": "http://asset.s4.cloudwalker.tv/images/tiles/4516f70191880d9c1b7494f8c8a730a0/ToontasticWinterCarnival_30Dec2023_AD_1920x500.webp",
           "portrait": "http://asset.s4.cloudwalker.tv/images/tiles/f94c426b3c51920658a040bd797f78e5/JioCinema_C_600x600.png",
           "background": "http://asset.s4.cloudwalker.tv/images/tiles/f94c426b3c51920658a040bd797f78e5/JioCinema_1920x1080.webp",
           "ads_server": "https://tiles.springserve.com/nv/835421?w=1920&h=1080&sizes={{SIZES}}&cb={{CACHEBUSTER}}&ip={{IP}}&ua={{USER_AGENT}}&app_bundle={{APP_BUNDLE}}&app_name={{APP_NAME}}&app_store_url={{APP_STORE_URL}}&did={{DEVICE_ID}}&us_privacy={{US_PRIVACY}}",
+          "adsVideoUrl": "https://tv.springserve.com/rt/21849?w=1920&h=1080&cb=1677785165&pod_max_dur=60",
           "rating": 0,
           "runtime": "",
           "startTime": 0,

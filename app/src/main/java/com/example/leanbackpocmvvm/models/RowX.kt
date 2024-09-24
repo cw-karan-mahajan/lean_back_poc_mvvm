@@ -1,8 +1,8 @@
 package com.example.leanbackpocmvvm.models
 
 
-import com.google.gson.annotations.SerializedName
 import androidx.annotation.Keep
+import com.google.gson.annotations.SerializedName
 import java.io.Serializable
 
 
@@ -89,5 +89,7 @@ data class RowItemX(
     var layout: String,
     @SerializedName("ads_server")
     val adsServer: String? = null,
-    var adImageUrl: String? = null
+    var adImageUrl: String? = null,
+    @SerializedName("adsVideoUrl")
+    var adsVideoUrl: String? = null
 ) : Serializable

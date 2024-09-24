@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
+import androidx.multidex.MultiDex
 import com.bumptech.glide.Glide
 import com.bumptech.glide.GlideBuilder
 import com.bumptech.glide.MemoryCategory
@@ -29,6 +30,7 @@ class AvLeanback : Application(), ComponentCallbacks2 {
 
     override fun onCreate() {
         super.onCreate()
+        MultiDex.install(this)
         setupIdleHandler()
         configureGlide()
     }

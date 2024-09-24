@@ -20,6 +20,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -90,7 +91,8 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideApiService(retrofitBuilder: Retrofit.Builder, okHttpClientBuilder: OkHttpClient.Builder, headerInterceptor: HeaderInterceptor): ApiService {
+    fun provideApiService(retrofitBuilder: Retrofit.Builder, okHttpClientBuilder: OkHttpClient.Builder,
+                          headerInterceptor: HeaderInterceptor): ApiService {
         val client = okHttpClientBuilder
             .addInterceptor(headerInterceptor)
             .build()
@@ -101,6 +103,7 @@ object AppModule {
             .create(ApiService::class.java)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Provides
     @Singleton
     fun provideAdRepository(

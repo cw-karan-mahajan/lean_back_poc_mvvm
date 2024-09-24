@@ -14,7 +14,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
-import retrofit2.Response
 import java.util.Collections
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,7 +29,6 @@ class AdRepositoryImpl @Inject constructor(
     private val maxConcurrentCalls = 20
     private val adDispatcher = Dispatchers.IO.limitedParallelism(maxConcurrentCalls)
     private val impressionUrls = Collections.synchronizedMap(mutableMapOf<String, List<String>>())
-    private val trackedImpressions = Collections.synchronizedSet(mutableSetOf<String>())
 
     companion object {
         private const val TAG = "AdRepositoryImpl"

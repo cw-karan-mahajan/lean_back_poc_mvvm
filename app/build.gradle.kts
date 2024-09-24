@@ -14,6 +14,7 @@ android {
         applicationId = "com.example.leanbackpocmvvm"
         minSdk = 21
         targetSdk = 34
+        multiDexEnabled = true
         versionCode = 1
         versionName = "1.0"
 
@@ -80,13 +81,10 @@ dependencies {
     kapt("com.google.dagger:hilt-android-compiler:2.50")
 
 
-    val media3_version = "1.3.1"
+    val media3_version = "1.4.1"
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
-    implementation("androidx.media3:media3-common:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-dash:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-hls:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-rtsp:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-smoothstreaming:$media3_version")
+    implementation("androidx.media3:media3-exoplayer-ima:$media3_version")
+    implementation("androidx.multidex:multidex:2.0.1")
 
 }
