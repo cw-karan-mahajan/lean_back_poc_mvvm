@@ -102,7 +102,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
             background = ContextCompat.getDrawable(context, R.drawable.focus_onselect_bg)
-            visibility = INVISIBLE
+            visibility = GONE
         }
         innerLayout.addView(focusOverlay)
 
@@ -305,8 +305,9 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         thumbnailOverlay.visibility = View.VISIBLE
     }
 
-    fun startVideoPlayback() {
+    fun startVideoPlayback(isAd: Boolean) {
         isVideoPlaying = true
+
         stretchCard()
         updateFocusOverlayVisibility(true)
 
@@ -368,8 +369,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun updateFocusOverlayVisibility(hasFocus: Boolean) {
-        val shouldBeVisible = hasFocus || isVideoPlaying
-        focusOverlay.visibility = if (shouldBeVisible) View.VISIBLE else View.INVISIBLE
+        lifecycleOwner.lifecycleScope.launch {
+            val shouldBeVisible = hasFocus || isVideoPlaying
+            focusOverlay.visibility = if (shouldBeVisible) View.VISIBLE else View.INVISIBLE
+        }
     }
 
     fun resetCardState() {

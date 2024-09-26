@@ -169,16 +169,18 @@ class MainViewModel @Inject constructor(
 
             isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
 
-
-
             if (isCurrentRowAutoScrollable) {
-                if (item.rowItemX.videoUrl != null) {
-                    scheduleVideoPlay(item, rowIndex, itemIndex)
+                if (item.rowItemX.tileType == "typeAdsVideo" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
+                    scheduleVideoPlay(item, rowIndex, itemIndex, true)
+                } else if (item.rowItemX.videoUrl != null) {
+                    scheduleVideoPlay(item, rowIndex, itemIndex, false)
                 } else {
                     scheduleAutoScrollResume(rowIndex, itemIndex)
                 }
+            } else if (item.rowItemX.tileType == "typeAdsVideo" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
+                scheduleVideoPlay(item, rowIndex, itemIndex, true)
             } else if (item.rowItemX.videoUrl != null) {
-                scheduleVideoPlay(item, rowIndex, itemIndex)
+                scheduleVideoPlay(item, rowIndex, itemIndex, false)
             }
 
             currentPlayingRowIndex = rowIndex
@@ -232,12 +234,10 @@ class MainViewModel @Inject constructor(
                         AutoScrollCommand(currentAutoScrollRowIndex, currentAutoScrollItemIndex)
                     _shrinkCardCommand.value = nextItem.rowItemX.tid
 
-                    if (nextItem.rowItemX.videoUrl != null) {
-                        scheduleVideoPlay(
-                            nextItem,
-                            currentAutoScrollRowIndex,
-                            currentAutoScrollItemIndex
-                        )
+                    if (nextItem.rowItemX.tileType == "typeAdsVideo" && !nextItem.rowItemX.adsVideoUrl.isNullOrEmpty()) {
+                        scheduleVideoPlay(nextItem, currentAutoScrollRowIndex, currentAutoScrollItemIndex, true)
+                    } else if (nextItem.rowItemX.videoUrl != null) {
+                        scheduleVideoPlay(nextItem, currentAutoScrollRowIndex, currentAutoScrollItemIndex, false)
                     } else {
                         // For non-video tiles, wait 5 seconds before moving to the next item
                         delayJob = launch {
@@ -257,23 +257,29 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
+    private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int, isAd: Boolean) {
         cancelPendingPlayback()
         pendingVideoPlay = item
         playbackJob = viewModelScope.launch {
             delay(VIDEO_START_DELAY)
             if (currentPlayingRowIndex == rowIndex && currentPlayingItemIndex == itemIndex) {
-                playVideo(item, rowIndex, itemIndex)
+                playVideo(item, rowIndex, itemIndex, isAd)
             }
         }
     }
 
-    private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
-        item.rowItemX.videoUrl?.let { videoUrl ->
+    private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int, isAd: Boolean) {
+        val videoUrl = if (isAd) item.rowItemX.adsVideoUrl else item.rowItemX.videoUrl
+        if (videoUrl != null) {
             addPlayedVideoTileId(item.rowItemX.tid)
             _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
             currentlyPlayingVideoTileId = item.rowItemX.tid
-            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid)
+            _playVideoCommand.value = PlayVideoCommand(
+                videoUrl = videoUrl,
+                tileId = item.rowItemX.tid,
+                adsVideoUrl = if (isAd) videoUrl else null,
+                tileType = item.rowItemX.tileType
+            )
         }
     }
 
@@ -382,8 +388,10 @@ class MainViewModel @Inject constructor(
     }
 
     fun preloadVideo(item: CustomRowItemX) {
-        item.rowItemX.videoUrl?.let { videoUrl ->
-            _preloadVideoCommand.value = PreloadVideoCommand(videoUrl)
+        if (item.rowItemX.tileType == "typeAdsVideo" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
+            _preloadVideoCommand.value = PreloadVideoCommand(item.rowItemX.adsVideoUrl ?: "")
+        } else if (item.rowItemX.videoUrl != null) {
+            _preloadVideoCommand.value = PreloadVideoCommand(item.rowItemX.videoUrl)
         }
     }
 
@@ -406,7 +414,7 @@ class MainViewModel @Inject constructor(
                 results.forEach { (tileId, result) ->
                     when (result) {
                         is Resource.Success -> {
-                            Log.d(TAG, "Impression tracked successfully for tile: $impressions")
+                            Log.d(TAG, "Impression tracked successfully for tile: $tileId")
                         }
                         is Resource.Error -> {
                             Log.e(TAG, "Failed to track impression for tile: $tileId. Error: ${result.message}")
@@ -470,7 +478,9 @@ data class ContentData(
 @OptIn(UnstableApi::class)
 data class PlayVideoCommand(
     val videoUrl: String,
-    val tileId: String
+    val tileId: String,
+    val adsVideoUrl: String?,
+    val tileType: String
 )
 
 data class AutoScrollCommand(val rowIndex: Int, val itemIndex: Int)

@@ -39,6 +39,7 @@ import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
+import com.example.leanbackpocmvvm.views.viewmodel.PlayVideoCommand
 import com.example.leanbackpocmvvm.views.viewmodel.UiState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.cancelChildren
@@ -125,7 +126,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         viewModel.playVideoCommand.observe(viewLifecycleOwner) { command ->
             val cardView = view?.findViewWithTag<NewVideoCardView>(command.tileId)
-            cardView?.let { prepareVideoPlayback(it, command.videoUrl, command.tileId) }
+            cardView?.let { prepareVideoPlayback(it, command) }
             // Log the current set of played video tile IDs
             Log.d(TAG, "Current played video tile IDs: ${viewModel.playedVideoTileIds.joinToString()}")
         }
@@ -158,27 +159,26 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
     }
 
-    private fun prepareVideoPlayback(cardView: NewVideoCardView, videoUrl: String, tileId: String) {
-        // Stop any currently playing video
+    private fun prepareVideoPlayback(cardView: NewVideoCardView, command: PlayVideoCommand) {
         stopVideoPlayback()
-
-        // Set the new current playing card
         currentPlayingCard = cardView
-
-        // Remove PlayerView from its current parent
         (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
 
         cardView.prepareForVideoPlayback()
         cardView.videoPlaceholder.addView(sharedPlayerView)
 
-        exoPlayerManager.prepareVideo(videoUrl, sharedPlayerView,
+        exoPlayerManager.prepareVideo(
+            videoUrl = command.videoUrl,
+            adsVideoUrl = command.adsVideoUrl,
+            tileType = command.tileType,
+            playerView = sharedPlayerView,
             onReady = { isReady ->
                 if (isReady) {
-                    cardView.startVideoPlayback()
+                    cardView.startVideoPlayback(command.tileType == "typeAdsVideo")
                 }
             },
             onEnded = {
-                viewModel.onVideoEnded(tileId)
+                viewModel.onVideoEnded(command.tileId)
             }
         )
     }
@@ -193,7 +193,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                         val itemIndex = findItemIndex(row as? ListRow, item)
                         Log.d(TAG, "OnUserFocus")
                         viewModel.onUserFocus(item)
-                        //viewModel.onItemFocused(item, rowIndex, itemIndex)
+                        viewModel.onItemFocused(item, rowIndex, itemIndex)
                     }
                 }
                 else -> {
@@ -217,7 +217,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun populateRows(data: MyData2) {
         val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
             shadowEnabled = false
-            selectEffectEnabled = false
+            enableChildRoundedCorners(true)
+            selectEffectEnabled = true
         }
         rowsAdapter = ArrayObjectAdapter(lrp)
         val presenter = createCardLayout(viewLifecycleOwner)
