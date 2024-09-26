@@ -143,6 +143,7 @@ class ExoPlayerManager @Inject constructor(
     }
 
     private fun setupImaAdsLoader(onEnded: () -> Unit) {
+        adsLoader?.release()
         adsLoader = ImaAdsLoader.Builder(context)
             .setDebugModeEnabled(true)
             .setAdEventListener(buildAdEventListener(onEnded))
