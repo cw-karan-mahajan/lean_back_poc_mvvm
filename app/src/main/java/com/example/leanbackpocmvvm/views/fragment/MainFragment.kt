@@ -155,7 +155,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.preloadVideoCommand.observe(viewLifecycleOwner) { command ->
-            exoPlayerManager.preloadVideo(command.videoUrl)
+            //exoPlayerManager.preloadVideo(command.videoUrl)
         }
     }
 
@@ -167,10 +167,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         cardView.prepareForVideoPlayback()
         cardView.videoPlaceholder.addView(sharedPlayerView)
 
-        exoPlayerManager.prepareVideo(
-            videoUrl = command.videoUrl,
-            adsVideoUrl = command.adsVideoUrl,
-            tileType = command.tileType,
+        exoPlayerManager.prepareAd(
+            adsVideoUrl = command.adsVideoUrl ?: "",
             playerView = sharedPlayerView,
             onReady = { isReady ->
                 if (isReady) {
