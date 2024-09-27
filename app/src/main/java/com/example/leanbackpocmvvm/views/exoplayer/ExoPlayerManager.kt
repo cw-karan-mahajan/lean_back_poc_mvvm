@@ -63,6 +63,10 @@ class ExoPlayerManager @Inject constructor(
     private val isReleasing = AtomicBoolean(false)
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    init {
+
+    }
+
     private fun getOrCreatePlayer(): ExoPlayer {
         if (exoPlayer == null) {
             exoPlayer = createExoPlayer()
@@ -93,10 +97,11 @@ class ExoPlayerManager @Inject constructor(
 
                 when {
                     tileType == "typeAdsVideo" && !adsVideoUrl.isNullOrEmpty() -> {
-                        setupImaAdsLoader(onEnded)
-                        prepareImaAdsVideo(adsVideoUrl, playerView, videoUrl, onReady, onEnded)
+                        setupImaAdsLoader()
+                        prepareImaAdsVideo(
+                            player, adsVideoUrl, videoUrl, onReady, onEnded
+                        )
                     }
-
                     else -> {
                         prepareRegularVideo(videoUrl)
                     }
@@ -142,15 +147,18 @@ class ExoPlayerManager @Inject constructor(
         })
     }
 
-    private fun setupImaAdsLoader(onEnded: () -> Unit) {
-        adsLoader?.release()
-        adsLoader = ImaAdsLoader.Builder(context)
-            .setDebugModeEnabled(true)
-            .setAdEventListener(buildAdEventListener(onEnded))
-            .build()
+    private fun setupImaAdsLoader(): ImaAdsLoader {
+        //adsLoader?.release()
+        if (adsLoader == null) {
+            adsLoader = ImaAdsLoader.Builder(context)
+                .setDebugModeEnabled(true)
+                .setAdEventListener(buildAdEventListener())
+                .build()
+        }
+        return adsLoader!!
     }
 
-    private fun buildAdEventListener(onEnded: () -> Unit): AdEventListener {
+    private fun buildAdEventListener(): AdEventListener {
         return AdEventListener { event: AdEvent ->
             val eventType = event.type
             /* if (eventType != AdEventType.AD_PROGRESS) {
@@ -170,19 +178,10 @@ class ExoPlayerManager @Inject constructor(
     }
 
     private fun prepareImaAdsVideo(
-        adsVideoUrl: String, playerView: PlayerView, videoUrl: String, onReady: (Boolean) -> Unit,
+        player: ExoPlayer, adsVideoUrl: String, videoUrl: String, onReady: (Boolean) -> Unit,
         onEnded: () -> Unit
     ) {
-        val mediaSourceFactory: MediaSource.Factory =
-            DefaultMediaSourceFactory(context).setLocalAdInsertionComponents( { unusedAdTagUri: AdsConfiguration? -> adsLoader }, playerView)
 
-        // Create an ExoPlayer and set it as the player for content and ads.
-        val player = ExoPlayer.Builder(context)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
-
-        exoPlayer = player
-        playerView.player = player
         adsLoader?.setPlayer(player)
 
         // Create the MediaItem to play, specifying the content URI and ad tag URI.
@@ -263,7 +262,15 @@ class ExoPlayerManager @Inject constructor(
             setMediaCodecSelector(createMediaCodecSelector())
         }
 
+        val dataSourceFactory = DefaultDataSource.Factory(context)
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+            .setLocalAdInsertionComponents(
+                { adsLoader },
+                PlayerView(context)
+            )
+
         return ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(createLoadControl())
             .build()
             .apply {
@@ -333,6 +340,7 @@ class ExoPlayerManager @Inject constructor(
                 }
                 adsLoader?.release()
             } finally {
+                adsLoader = null
                 exoPlayer = null
                 adsLoader = null
                 isPlayingVideo.set(false)
