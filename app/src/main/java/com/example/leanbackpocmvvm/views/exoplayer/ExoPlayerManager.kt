@@ -33,26 +33,18 @@ class ExoPlayerManager @Inject constructor(
 
     private val STATIC_ASSET_FILE = "one_sec_video.mp4"
 
-    /*init {
-        setupImaAdsLoader()
-    }*/
-
-    private fun setupImaAdsLoader(): ImaAdsLoader {
-        if (adsLoader == null) {
-            adsLoader = ImaAdsLoader.Builder(context)
-                .setDebugModeEnabled(true)  // Set to true only for debugging
-                .setAdEventListener(buildAdEventListener())
-                .build()
-        }
-        return adsLoader!!
+    private fun getOrCreateAdsLoader(): ImaAdsLoader {
+        return adsLoader ?: ImaAdsLoader.Builder(context)
+            .setDebugModeEnabled(true)  // Set to false for production
+            .setAdEventListener(buildAdEventListener())
+            .build().also { adsLoader = it }
     }
 
     private fun buildAdEventListener(): AdEvent.AdEventListener = AdEvent.AdEventListener { event ->
         when (event.type) {
             AdEvent.AdEventType.LOADED -> isPlayingAd.set(true)
             AdEvent.AdEventType.ALL_ADS_COMPLETED -> isPlayingAd.set(false)
-            else -> { /* Handle other ad events if necessary */
-            }
+            else -> { /* Handle other ad events if necessary */ }
         }
     }
 
@@ -101,7 +93,7 @@ class ExoPlayerManager @Inject constructor(
 
     private fun getOrCreatePlayer(): ExoPlayer {
         if (exoPlayer == null) {
-            adsLoader = setupImaAdsLoader()
+            val adsLoader = getOrCreateAdsLoader()
             val mediaSourceFactory = DefaultMediaSourceFactory(context)
                 .setLocalAdInsertionComponents({ adsLoader }, PlayerView(context))
 
@@ -112,35 +104,27 @@ class ExoPlayerManager @Inject constructor(
                     videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
                     repeatMode = Player.REPEAT_MODE_OFF
                 }
-            adsLoader?.setPlayer(exoPlayer)
+            adsLoader.setPlayer(exoPlayer)
         }
         return exoPlayer!!
     }
 
-    private fun handlePlayerError(
-        error: PlaybackException,
-        player: ExoPlayer,
-        adsVideoUrl: String
-    ) {
+    private fun handlePlayerError(error: PlaybackException, player: ExoPlayer, adsVideoUrl: String) {
         when (error.errorCode) {
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
                 player.prepare()
             }
-
             PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
                 player.seekToDefaultPosition()
                 player.prepare()
             }
-
             else -> {
                 player.stop()
                 player.clearMediaItems()
                 val mediaItem = MediaItem.Builder()
                     .setUri(Uri.parse("asset:///$STATIC_ASSET_FILE"))
-                    .setAdsConfiguration(
-                        MediaItem.AdsConfiguration.Builder(Uri.parse(adsVideoUrl)).build()
-                    )
+                    .setAdsConfiguration(MediaItem.AdsConfiguration.Builder(Uri.parse(adsVideoUrl)).build())
                     .build()
                 player.setMediaItem(mediaItem)
                 player.prepare()

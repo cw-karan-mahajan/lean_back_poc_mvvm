@@ -82,8 +82,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            useController = false
+            useController = false  // Disable default controls
+            controllerAutoShow = false
         }
 
         return view
@@ -160,25 +160,24 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun prepareVideoPlayback(cardView: NewVideoCardView, command: PlayVideoCommand) {
-        stopVideoPlayback()
-        currentPlayingCard = cardView
-        (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
+        viewLifecycleOwner.lifecycleScope.launch {
+            stopVideoPlayback()
+            cardView.prepareForVideoPlayback()
+            cardView.videoPlaceholder.addView(sharedPlayerView)
 
-        cardView.prepareForVideoPlayback()
-        cardView.videoPlaceholder.addView(sharedPlayerView)
-
-        exoPlayerManager.prepareAd(
-            adsVideoUrl = command.adsVideoUrl ?: "",
-            playerView = sharedPlayerView,
-            onReady = { isReady ->
-                if (isReady) {
-                    cardView.startVideoPlayback(command.tileType == "typeAdsVideo")
+            exoPlayerManager.prepareAd(
+                adsVideoUrl = command.adsVideoUrl ?: "",
+                playerView = sharedPlayerView,
+                onReady = { isReady ->
+                    if (isReady) {
+                        cardView.startVideoPlayback(command.tileType == "typeAdsVideo")
+                    }
+                },
+                onEnded = {
+                    viewModel.onVideoEnded(command.tileId)
                 }
-            },
-            onEnded = {
-                viewModel.onVideoEnded(command.tileId)
-            }
-        )
+            )
+        }
     }
 
     private fun setupEventListeners() {
