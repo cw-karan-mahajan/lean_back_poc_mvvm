@@ -136,6 +136,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.shrinkCardCommand.observe(viewLifecycleOwner) { tileId ->
+            Log.d(NewVideoCardView.TAG, "MainFragment shrinkCardCommand" )
             val cardToUpdate = view?.findViewWithTag<NewVideoCardView>(tileId)
             cardToUpdate?.showThumbnail()
             cardToUpdate?.shrinkCard()

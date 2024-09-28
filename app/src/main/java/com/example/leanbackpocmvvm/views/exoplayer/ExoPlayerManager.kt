@@ -12,6 +12,7 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ima.ImaAdsLoader
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.google.ads.interactivemedia.v3.api.AdEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -56,7 +57,7 @@ class ExoPlayerManager @Inject constructor(
     ) {
         playerScope.launch {
             try {
-                val player = getOrCreatePlayer()
+                val player = getOrCreatePlayer(playerView)
                 playerView.player = player
 
                 val contentUri = Uri.parse("asset:///$STATIC_ASSET_FILE")
@@ -91,17 +92,19 @@ class ExoPlayerManager @Inject constructor(
         }
     }
 
-    private fun getOrCreatePlayer(): ExoPlayer {
+    private fun getOrCreatePlayer(playerView: PlayerView): ExoPlayer {
         if (exoPlayer == null) {
             val adsLoader = getOrCreateAdsLoader()
             val mediaSourceFactory = DefaultMediaSourceFactory(context)
-                .setLocalAdInsertionComponents({ adsLoader }, PlayerView(context))
+                .setLocalAdInsertionComponents({ adsLoader }, playerView)
+
+            playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIXED_WIDTH
 
             exoPlayer = ExoPlayer.Builder(context)
                 .setMediaSourceFactory(mediaSourceFactory)
                 .build()
                 .apply {
-                    videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                    videoScalingMode = C.VIDEO_SCALING_MODE_DEFAULT
                     repeatMode = Player.REPEAT_MODE_OFF
                 }
             adsLoader.setPlayer(exoPlayer)
