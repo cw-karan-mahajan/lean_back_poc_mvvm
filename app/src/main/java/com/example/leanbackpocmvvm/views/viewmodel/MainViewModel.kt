@@ -16,6 +16,7 @@ import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
+import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
@@ -170,22 +171,24 @@ class MainViewModel @Inject constructor(
             isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
 
             if (isCurrentRowAutoScrollable) {
-                if (item.rowItemX.tileType == "typeAdsVideo" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                    scheduleVideoPlay(item, rowIndex, itemIndex, true)
-                } else if (item.rowItemX.videoUrl != null) {
-                    scheduleVideoPlay(item, rowIndex, itemIndex, false)
+                if (isImaAdVideo(item.rowItemX)) {
+                    Log.d(NewVideoCardView.TAG, "MainViewModel onItemFocused video" )
+                    scheduleVideoPlay(item, rowIndex, itemIndex)
                 } else {
                     scheduleAutoScrollResume(rowIndex, itemIndex)
                 }
-            } else if (item.rowItemX.tileType == "typeAdsVideo" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                scheduleVideoPlay(item, rowIndex, itemIndex, true)
-            } else if (item.rowItemX.videoUrl != null) {
-                scheduleVideoPlay(item, rowIndex, itemIndex, false)
+            } else if (isImaAdVideo(item.rowItemX)) {
+                Log.d(NewVideoCardView.TAG, "MainViewModel onItemFocused video1" )
+                scheduleVideoPlay(item, rowIndex, itemIndex)
             }
 
             currentPlayingRowIndex = rowIndex
             currentPlayingItemIndex = itemIndex
         }
+    }
+
+    private fun isImaAdVideo(rowItem: RowItemX): Boolean {
+        return rowItem.adsVideoUrl != null && rowItem.tileType == "typeAdsVideo"
     }
 
     private fun isAutoScrollableRow(rowIndex: Int): Boolean {
@@ -235,10 +238,8 @@ class MainViewModel @Inject constructor(
                     _shrinkCardCommand.value = nextItem.rowItemX.tid
 
                     if (nextItem.rowItemX.tileType == "typeAdsVideo" && !nextItem.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                        scheduleVideoPlay(nextItem, currentAutoScrollRowIndex, currentAutoScrollItemIndex, true)
-                    } else if (nextItem.rowItemX.videoUrl != null) {
-                        scheduleVideoPlay(nextItem, currentAutoScrollRowIndex, currentAutoScrollItemIndex, false)
-                    } else {
+                        scheduleVideoPlay(nextItem, currentAutoScrollRowIndex, currentAutoScrollItemIndex)
+                    }  else {
                         // For non-video tiles, wait 5 seconds before moving to the next item
                         delayJob = launch {
                             delay(AUTO_SCROLL_DELAY)
@@ -257,27 +258,27 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int, isAd: Boolean) {
+    private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
         cancelPendingPlayback()
         pendingVideoPlay = item
         playbackJob = viewModelScope.launch {
             delay(VIDEO_START_DELAY)
             if (currentPlayingRowIndex == rowIndex && currentPlayingItemIndex == itemIndex) {
-                playVideo(item, rowIndex, itemIndex, isAd)
+                playVideo(item, rowIndex, itemIndex)
             }
         }
     }
 
-    private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int, isAd: Boolean) {
-        val videoUrl = if (isAd) item.rowItemX.adsVideoUrl else item.rowItemX.videoUrl
-        if (videoUrl != null) {
+    private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
+        val adsVideoUrl = item.rowItemX.adsVideoUrl
+        if (isImaAdVideo(item.rowItemX)) {
             addPlayedVideoTileId(item.rowItemX.tid)
-            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, adsVideoUrl!!)
             currentlyPlayingVideoTileId = item.rowItemX.tid
             _playVideoCommand.value = PlayVideoCommand(
-                videoUrl = videoUrl,
+                videoUrl = adsVideoUrl,
                 tileId = item.rowItemX.tid,
-                adsVideoUrl = if (isAd) videoUrl else null,
+                adsVideoUrl = adsVideoUrl,
                 tileType = item.rowItemX.tileType
             )
         }

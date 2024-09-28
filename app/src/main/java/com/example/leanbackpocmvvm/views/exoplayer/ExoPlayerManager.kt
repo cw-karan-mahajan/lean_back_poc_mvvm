@@ -14,6 +14,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.ima.ImaAdsLoader
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.google.ads.interactivemedia.v3.api.AdEvent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -32,19 +33,22 @@ class ExoPlayerManager @Inject constructor(
     private val isReleasing = AtomicBoolean(false)
     private val playerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    private val STATIC_ASSET_FILE = "one_sec_video.mp4"
+    private val STATIC_ASSET_FILE = "point_one_sec.mp4"
 
-    private fun getOrCreateAdsLoader(): ImaAdsLoader {
+    private fun getOrCreateAdsLoader(onEnded: () -> Unit): ImaAdsLoader {
         return adsLoader ?: ImaAdsLoader.Builder(context)
             .setDebugModeEnabled(true)  // Set to false for production
-            .setAdEventListener(buildAdEventListener())
+            .setAdEventListener(buildAdEventListener(onEnded))
             .build().also { adsLoader = it }
     }
 
-    private fun buildAdEventListener(): AdEvent.AdEventListener = AdEvent.AdEventListener { event ->
+    private fun buildAdEventListener(onEnded: () -> Unit): AdEvent.AdEventListener = AdEvent.AdEventListener { event ->
         when (event.type) {
-            AdEvent.AdEventType.LOADED -> isPlayingAd.set(true)
-            AdEvent.AdEventType.ALL_ADS_COMPLETED -> isPlayingAd.set(false)
+            //AdEvent.AdEventType.LOADED -> isPlayingAd.set(true)
+            AdEvent.AdEventType.ALL_ADS_COMPLETED -> {
+                isPlayingAd.set(false)
+                onEnded()
+            }
             else -> { /* Handle other ad events if necessary */ }
         }
     }
@@ -57,8 +61,10 @@ class ExoPlayerManager @Inject constructor(
     ) {
         playerScope.launch {
             try {
-                val player = getOrCreatePlayer(playerView)
+                Log.d(NewVideoCardView.TAG, "---prepareAd" )
+                val player = getOrCreatePlayer(playerView, onEnded)
                 playerView.player = player
+                playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
 
                 val contentUri = Uri.parse("asset:///$STATIC_ASSET_FILE")
                 val adTagUri = Uri.parse(adsVideoUrl)
@@ -69,13 +75,13 @@ class ExoPlayerManager @Inject constructor(
 
                 player.setMediaItem(mediaItem)
                 player.prepare()
-                player.playWhenReady = true
+                //player.playWhenReady = true
 
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         when (state) {
                             Player.STATE_READY -> onReady(true)
-                            Player.STATE_ENDED -> onEnded()
+                            //Player.STATE_ENDED -> onEnded()
                         }
                     }
 
@@ -85,6 +91,8 @@ class ExoPlayerManager @Inject constructor(
                         handlePlayerError(error, player, adsVideoUrl)
                     }
                 })
+
+                player.playWhenReady = true
             } catch (e: Exception) {
                 Log.e(TAG, "Error preparing ad: ${e.message}")
                 onReady(false)
@@ -92,9 +100,10 @@ class ExoPlayerManager @Inject constructor(
         }
     }
 
-    private fun getOrCreatePlayer(playerView: PlayerView): ExoPlayer {
+    private fun getOrCreatePlayer(playerView: PlayerView, onEnded: () -> Unit): ExoPlayer {
         if (exoPlayer == null) {
-            val adsLoader = getOrCreateAdsLoader()
+            Log.d(NewVideoCardView.TAG, "---getOrCreatePlayer" )
+            val adsLoader = getOrCreateAdsLoader(onEnded)
             val mediaSourceFactory = DefaultMediaSourceFactory(context)
                 .setLocalAdInsertionComponents({ adsLoader }, playerView)
 

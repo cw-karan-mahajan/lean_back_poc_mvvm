@@ -125,6 +125,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.playVideoCommand.observe(viewLifecycleOwner) { command ->
+            Log.d(NewVideoCardView.TAG, "MainFragment playVideoCommand" )
             val cardView = view?.findViewWithTag<NewVideoCardView>(command.tileId)
             cardView?.let { prepareVideoPlayback(it, command) }
             // Log the current set of played video tile IDs
@@ -143,7 +144,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.resetCardCommand.observe(viewLifecycleOwner) { tileId ->
+            Log.d(NewVideoCardView.TAG, "MainFragment resetCardCommand" )
             val cardToReset = view?.findViewWithTag<NewVideoCardView>(tileId)
+            cardToReset?.isVideoPlaying = false
             cardToReset?.resetCardState()
         }
 
@@ -162,6 +165,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     private fun prepareVideoPlayback(cardView: NewVideoCardView, command: PlayVideoCommand) {
         viewLifecycleOwner.lifecycleScope.launch {
+            Log.d(NewVideoCardView.TAG, "MainFragment prepareVideoPlayback inside" )
             stopVideoPlayback()
             cardView.prepareForVideoPlayback()
             cardView.videoPlaceholder.addView(sharedPlayerView)
@@ -171,10 +175,12 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 playerView = sharedPlayerView,
                 onReady = { isReady ->
                     if (isReady) {
-                        cardView.startVideoPlayback(command.tileType == "typeAdsVideo")
+                        Log.d(NewVideoCardView.TAG, "MainFragment prepareVideoPlayback isReady $isReady" )
+                        cardView.startVideoPlayback()
                     }
                 },
                 onEnded = {
+                    Log.d(NewVideoCardView.TAG, "MainFragment prepareVideoPlayback Ended" )
                     viewModel.onVideoEnded(command.tileId)
                 }
             )

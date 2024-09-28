@@ -134,7 +134,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
         setOnFocusChangeListener { _, hasFocus ->
             updateFocusOverlayVisibility(hasFocus)
-            Log.d(TAG, "hasFocus $hasFocus  isVideoPlaying $isVideoPlaying" )
+            Log.d(TAG, "hasFocus $hasFocus  isVideoPlaying $isVideoPlaying")
             if (hasFocus) {
                 if (isVideoPlaying) {
                     stretchCard()
@@ -142,7 +142,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
                     shrinkCard()
                 }
             } else {
-                shrinkCard()
+                if (isVideoPlaying) {
+                    stretchCard()
+                } else
+                    shrinkCard()
             }
         }
     }
@@ -280,11 +283,11 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
         originalWidth = width
         originalHeight = height
-        Log.d(TAG, "OriginalHeight $originalHeight  originalWidth $originalWidth" )
+        Log.d(TAG, "OriginalHeight $originalHeight  originalWidth $originalWidth")
         stretchedWidth = if (isReqStretched) width else (width * 2.5).toInt()
         stretchedHeight = if (isReqStretched) 600 else (width * 1.5).toInt()
 
-        Log.d(TAG, "Height $stretchedHeight  width $stretchedWidth" )
+        Log.d(TAG, "Height $stretchedHeight  width $stretchedWidth")
 
         //resizeCard(false) // Initially set to non-stretched size
     }
@@ -309,7 +312,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         thumbnailOverlay.visibility = View.VISIBLE
     }
 
-    fun startVideoPlayback(isAd: Boolean) {
+    fun startVideoPlayback() {
+        Log.d(TAG, "MainFragment startVideoPlayback")
         isVideoPlaying = true
 
         stretchCard()
@@ -333,7 +337,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun resizeCard(stretch: Boolean) {
-        Log.d(TAG, "---resizeCard $stretch" )
+        Log.d(TAG, "---resizeCard $stretch")
         val targetWidth = if (stretch) stretchedWidth else originalWidth
         val targetHeight = if (stretch) stretchedHeight else originalHeight
 
@@ -354,13 +358,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
     private fun stretchCard() {
         lifecycleOwner.lifecycleScope.launch {
-            Log.d(TAG, "stretchCard true" )
+            Log.d(TAG, "stretchCard true")
             resizeCard(true)
         }
     }
 
     fun shrinkCard() {
         lifecycleOwner.lifecycleScope.launch {
+            isVideoPlaying = false
             Log.d(TAG, "Shrinking card false")
             resizeCard(false)
         }
@@ -382,17 +387,17 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun resetCardState() {
-        isVideoPlaying = false
+        //isVideoPlaying = false
         videoPlaceholder.visibility = View.GONE
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailOverlay.visibility = View.GONE
         loaderView.visibility = View.GONE
-        shrinkCard()
-        updateFocusOverlayVisibility(isFocused)
+        //shrinkCard()
+        //updateFocusOverlayVisibility(isFocused)
     }
 
     companion object {
-         const val TAG = "NewVideoCardView"
+        const val TAG = "NewVideoCardView"
     }
 }
