@@ -198,6 +198,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                         Log.d(TAG, "OnUserFocus")
                         viewModel.onUserFocus(item)
                         viewModel.onItemFocused(item, rowIndex, itemIndex)
+                        stopVideoPlayback()
                     }
                 }
                 else -> {

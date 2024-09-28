@@ -334,6 +334,9 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         shrinkCard()
         isVideoPlaying = false
         updateFocusOverlayVisibility(isFocused)
+
+        videoPlaceholder.removeAllViews()
+        videoPlaceholder.visibility = View.GONE
     }
 
     private fun resizeCard(stretch: Boolean) {

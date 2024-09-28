@@ -89,6 +89,8 @@ class MainViewModel @Inject constructor(
     private val _pendingImpressions = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
     private val _trackedImpressionTileIds = Collections.synchronizedSet(mutableSetOf<String>())
     private var impressionTrackingJob: Job? = null
+    private var currentlyPlayingAdTileId: String? = null
+
 
     fun loadData() {
         viewModelScope.launch {
@@ -160,6 +162,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             lastInteractionTime = System.currentTimeMillis()
 
+            // Check if we're switching from a currently playing ad
+            if (currentlyPlayingAdTileId != null && currentlyPlayingAdTileId != item.rowItemX.tid) {
+                cleanupPreviousAdTile(currentlyPlayingAdTileId!!)
+            }
+
             if (rowIndex != currentPlayingRowIndex || itemIndex != currentPlayingItemIndex) {
                 withContext(Dispatchers.Main) {
                     stopAndShrinkPreviousItem()
@@ -172,13 +179,13 @@ class MainViewModel @Inject constructor(
 
             if (isCurrentRowAutoScrollable) {
                 if (isImaAdVideo(item.rowItemX)) {
-                    Log.d(NewVideoCardView.TAG, "MainViewModel onItemFocused video" )
+                    Log.d(NewVideoCardView.TAG, "MainViewModel onItemFocused video")
                     scheduleVideoPlay(item, rowIndex, itemIndex)
                 } else {
                     scheduleAutoScrollResume(rowIndex, itemIndex)
                 }
             } else if (isImaAdVideo(item.rowItemX)) {
-                Log.d(NewVideoCardView.TAG, "MainViewModel onItemFocused video1" )
+                Log.d(NewVideoCardView.TAG, "MainViewModel onItemFocused video1")
                 scheduleVideoPlay(item, rowIndex, itemIndex)
             }
 
@@ -186,9 +193,14 @@ class MainViewModel @Inject constructor(
             currentPlayingItemIndex = itemIndex
         }
     }
-
     private fun isImaAdVideo(rowItem: RowItemX): Boolean {
         return rowItem.adsVideoUrl != null && rowItem.tileType == "typeAdsVideo"
+    }
+
+    private fun cleanupPreviousAdTile(tileId: String) {
+        _shrinkCardCommand.value = tileId
+        _resetCardCommand.value = tileId
+        currentlyPlayingAdTileId = null
     }
 
     private fun isAutoScrollableRow(rowIndex: Int): Boolean {
@@ -275,6 +287,7 @@ class MainViewModel @Inject constructor(
             addPlayedVideoTileId(item.rowItemX.tid)
             _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, adsVideoUrl!!)
             currentlyPlayingVideoTileId = item.rowItemX.tid
+            currentlyPlayingAdTileId = item.rowItemX.tid  // Set the currently playing ad tile
             _playVideoCommand.value = PlayVideoCommand(
                 videoUrl = adsVideoUrl,
                 tileId = item.rowItemX.tid,
@@ -307,6 +320,7 @@ class MainViewModel @Inject constructor(
 
     fun onVideoEnded(tileId: String) {
         handleVideoEnded(tileId)
+        currentlyPlayingAdTileId = null
     }
 
     fun onUserFocus(item: CustomRowItemX) {
