@@ -162,7 +162,6 @@ class ExoPlayerManager @Inject constructor(
             setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             setMediaCodecSelector(createMediaCodecSelector())
         }
-
         return ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(createLoadControl())
             .build()

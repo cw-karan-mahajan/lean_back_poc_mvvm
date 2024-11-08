@@ -72,6 +72,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.retrofit2:converter-scalars:2.0.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.1")
+    implementation("com.squareup.okhttp3:okhttp:4.9.1")
     // Moshi
     implementation("com.squareup.moshi:moshi-kotlin:1.11.0")
     implementation("com.squareup.moshi:moshi-adapters:1.11.0")
@@ -80,13 +81,8 @@ dependencies {
     kapt("com.google.dagger:hilt-android-compiler:2.50")
 
 
-    val media3_version = "1.3.1"
+    val media3_version = "1.4.1"
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
-    implementation("androidx.media3:media3-common:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-dash:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-hls:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-rtsp:$media3_version")
-    implementation("androidx.media3:media3-exoplayer-smoothstreaming:$media3_version")
 
 }
