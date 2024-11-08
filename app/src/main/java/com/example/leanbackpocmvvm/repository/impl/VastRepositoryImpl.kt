@@ -34,7 +34,6 @@ class VastRepositoryImpl @Inject constructor(
             emit(Resource.error<VastAd>("No internet connection"))
             return@flow
         }
-
         try {
             emit(Resource.loading<VastAd>())
             val operationKey = "parse_$tileId"
@@ -42,7 +41,6 @@ class VastRepositoryImpl @Inject constructor(
                 val vastAd = withTimeout(TIMEOUT_MS) {
                     vastParser.parseVastUrl(vastUrl, tileId)
                 }
-
                 if (vastAd != null) {
                     emit(Resource.success<VastAd>(vastAd))
                 } else {
@@ -74,7 +72,6 @@ class VastRepositoryImpl @Inject constructor(
             emit(Resource.error<Boolean>("No internet connection"))
             return@flow
         }
-
         try {
             emit(Resource.loading<Boolean>())
             val request = Request.Builder()
@@ -110,7 +107,6 @@ class VastRepositoryImpl @Inject constructor(
 
         try {
             emit(Resource.loading<VastAd>())
-
             val operationKey = "preload_$tileId"
             val job = coroutineScope.launch {
                 val vastAd = withTimeout(TIMEOUT_MS) {
@@ -127,7 +123,6 @@ class VastRepositoryImpl @Inject constructor(
                     emit(Resource.error<VastAd>("Failed to preload VAST XML"))
                 }
             }
-
             ongoingOperations[operationKey] = job
             job.join()
             ongoingOperations.remove(operationKey)

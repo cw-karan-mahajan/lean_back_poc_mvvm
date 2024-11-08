@@ -29,7 +29,6 @@ class HeaderInterceptor @Inject constructor() : Interceptor {
     private fun getDeviceInfo(): Map<String, String> {
         val deviceInfo = mutableMapOf<String, String>()
 
-
         // Get device-specific information using the getSystemProperty function
         deviceInfo["host"] = "dev-cloudwalkerx2.do.cloudwalker.tv"
         deviceInfo["x-real-ip"] = "103.189.184.185"

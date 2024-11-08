@@ -5,14 +5,11 @@ import androidx.annotation.OptIn
 import androidx.lifecycle.*
 import androidx.leanback.widget.*
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.PlayerView
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
-import com.example.leanbackpocmvvm.views.activity.MainActivity
-import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
@@ -104,6 +101,8 @@ class MainViewModel @Inject constructor(
                         _uiState.value = UiState.Error(response.message)
                         _toastMessage.postValue("Error loading data: ${response.message}")
                     }
+
+                    is Resource.Loading -> {}
                 }
             }
         }
