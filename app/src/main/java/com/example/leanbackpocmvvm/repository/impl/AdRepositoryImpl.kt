@@ -103,10 +103,6 @@ class AdRepositoryImpl @Inject constructor(
     }
 
     private suspend fun trackSingleImpression(impUrl: String): Resource<Unit> {
-//        if (!trackedImpressions.add(impUrl)) {
-//            return Resource.success(Unit)
-//        }
-
         return try {
             val adApiService = dynamicApiServiceFactory.createService(AdApiService::class.java, impUrl)
             val path = dynamicApiServiceFactory.extractPath(impUrl)

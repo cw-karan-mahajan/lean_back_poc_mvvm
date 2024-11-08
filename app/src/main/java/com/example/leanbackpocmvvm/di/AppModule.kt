@@ -4,21 +4,27 @@ import android.content.Context
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.core.Constants.BASE_URL
 import com.example.leanbackpocmvvm.remote.ApiService
+import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.remote.HeaderInterceptor
+import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
+import com.example.leanbackpocmvvm.repository.impl.AdRepositoryImpl
 import com.example.leanbackpocmvvm.utils.Network
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import javax.inject.Singleton
 
 @Module
@@ -27,7 +33,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGson(): Gson = Gson()
+    fun provideGson(): Gson = GsonBuilder().setLenient().create()
 
     @Provides
     @Singleton
@@ -50,32 +56,62 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideDynamicApiServiceFactory(
+        retrofitBuilder: Retrofit.Builder,
+        okHttpClientBuilder: OkHttpClient.Builder
+    ): DynamicApiServiceFactory {
+        return DynamicApiServiceFactory(retrofitBuilder, okHttpClientBuilder)
+    }
+
+    @Provides
+    @Singleton
     fun provideHeaderInterceptor(): HeaderInterceptor {
         return HeaderInterceptor()
     }
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(headerInterceptor: HeaderInterceptor): OkHttpClient {
+    fun provideOkHttpClientBuilder(): OkHttpClient.Builder {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
         return OkHttpClient.Builder()
             .hostnameVerifier { _, _ -> true }
-            .addInterceptor(headerInterceptor)
             .addInterceptor(loggingInterceptor)
-            .build()
     }
 
     @Provides
     @Singleton
-    fun providesFetchApi(okHttpClient: OkHttpClient): ApiService = Retrofit
-        .Builder()
-        .client(okHttpClient)
-        .baseUrl(BASE_URL)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(ApiService::class.java)
+    fun provideRetrofitBuilder(gson: Gson): Retrofit.Builder {
+        return Retrofit.Builder()
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
+    }
+
+    @Provides
+    @Singleton
+    fun provideApiService(retrofitBuilder: Retrofit.Builder, okHttpClientBuilder: OkHttpClient.Builder,
+                          headerInterceptor: HeaderInterceptor): ApiService {
+        val client = okHttpClientBuilder
+            .addInterceptor(headerInterceptor)
+            .build()
+        return retrofitBuilder
+            .baseUrl(BASE_URL)
+            .client(client)
+            .build()
+            .create(ApiService::class.java)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Provides
+    @Singleton
+    fun provideAdRepository(
+        dynamicApiServiceFactory: DynamicApiServiceFactory,
+        networkConnectivity: NetworkConnectivity,
+        gson: Gson
+    ): AdRepository {
+        return AdRepositoryImpl(dynamicApiServiceFactory, networkConnectivity, gson)
+    }
 
     @UnstableApi
     @Provides
@@ -85,5 +121,4 @@ object AppModule {
     ): ExoPlayerManager {
         return ExoPlayerManager(context)
     }
-
 }
