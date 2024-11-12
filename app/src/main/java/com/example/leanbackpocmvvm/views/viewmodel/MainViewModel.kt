@@ -130,7 +130,14 @@ class MainViewModel @Inject constructor(
             apiRepository1.fetchList().distinctUntilChanged().collect { response ->
                 when (response) {
                     is Resource.Success -> {
-                        _uiState.value = UiState.Success(response.data)
+                        val myData2 = response.data
+                        val adUrls = myData2.rows
+                            .filter { it.rowLayout == "landscape" && it.rowAdConfig != null && it.rowAdConfig.rowAdType == "typeAdsBanner" }
+                            .flatMap { it.rowItems }
+                            .mapNotNull { it.adsServer }
+                        val adResponses = adRepository.fetchAds(adUrls)
+                        updateDataWithAds(myData2, adResponses)
+                        _uiState.value = UiState.Success(myData2)
                     }
 
                     is Resource.Error -> {

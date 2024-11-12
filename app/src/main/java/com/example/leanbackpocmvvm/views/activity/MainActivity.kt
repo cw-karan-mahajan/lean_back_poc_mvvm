@@ -7,6 +7,7 @@ import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.application.AvLeanback
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.example.leanbackpocmvvm.views.fragment.MainFragment
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
