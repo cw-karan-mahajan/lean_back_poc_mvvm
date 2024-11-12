@@ -4,11 +4,8 @@ import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.fragment.app.FragmentActivity
 import androidx.media3.common.util.UnstableApi
-import com.bumptech.glide.Glide
-import com.example.leanbackpocmvvm.views.fragment.MainFragment
 import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.application.AvLeanback
-import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject

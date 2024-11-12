@@ -6,8 +6,10 @@ import androidx.lifecycle.*
 import androidx.leanback.widget.*
 import androidx.media3.common.util.UnstableApi
 import com.example.leanbackpocmvvm.core.Resource
+import com.example.leanbackpocmvvm.models.AdResponse
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
+import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import java.util.Collections
 import javax.inject.Inject
 
 @UnstableApi
@@ -24,6 +27,7 @@ import javax.inject.Inject
 class MainViewModel @Inject constructor(
     private val repository: MainRepository,
     private val apiRepository1: MainRepository1,
+    private val adRepository: AdRepository,
     private val exoPlayerManager: ExoPlayerManager,
 ) : ViewModel() {
 
@@ -72,19 +76,51 @@ class MainViewModel @Inject constructor(
     private val VIDEO_START_DELAY = 5000L // 5 seconds delay before playing video
     private val USER_IDLE_DELAY = 5000L // 5 seconds
     var mRowsAdapter: ArrayObjectAdapter? = null
-    private val _fullyVisibleTileIds = mutableSetOf<String>()
-
     private val _playedVideoTileIds = mutableSetOf<String>()
     val playedVideoTileIds: Set<String> = _playedVideoTileIds
 
+    private val _fullyVisibleTileIds = Collections.synchronizedSet(mutableSetOf<String>())
+    private val _pendingImpressions =
+        Collections.synchronizedList(mutableListOf<Pair<String, String>>())
+    private val _trackedImpressionTileIds = Collections.synchronizedSet(mutableSetOf<String>())
+    private var impressionTrackingJob: Job? = null
+    private var currentlyPlayingAdTileId: String? = null
 
     fun loadData() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             try {
                 val myData2 = repository.getMyData()
+                val adUrls = myData2.rows
+                    .filter { it.rowLayout == "landscape" && it.rowAdConfig != null && it.rowAdConfig.rowAdType == "typeAdsBanner" }
+                    .flatMap { it.rowItems }
+                    .mapNotNull { it.adsServer }
+
+                val adResponses = adRepository.fetchAds(adUrls)
+                updateDataWithAds(myData2, adResponses)
                 _uiState.value = UiState.Success(myData2)
             } catch (e: Exception) {
-                _toastMessage.postValue("Error loading data: ${e.message}")
+                _uiState.value = UiState.Error("Error loading data: ${e.message}")
+            }
+        }
+    }
+
+    private fun updateDataWithAds(
+        data: MyData2,
+        adResponses: List<Pair<String, Resource<AdResponse>>>
+    ) {
+        data.rows.forEach { row ->
+            if (row.rowLayout == "landscape" && row.rowAdConfig != null && row.rowAdConfig.rowAdType == "typeAdsBanner") {
+                row.rowItems.forEach { item ->
+                    item.adsServer?.let { adUrl ->
+                        val adResponse = adResponses.find { it.first == adUrl }?.second
+                        if (adResponse is Resource.Success) {
+                            val imageUrl = adResponse.data.seatbid
+                                ?.firstOrNull()?.bid
+                                ?.firstOrNull()?.parsedImageUrl
+                            item.adImageUrl = imageUrl
+                        }
+                    }
+                }
             }
         }
     }
@@ -149,7 +185,7 @@ class MainViewModel @Inject constructor(
     private fun isAutoScrollableRow(rowIndex: Int): Boolean {
         val row = mRowsAdapter?.get(rowIndex) as? ListRow
         val firstItem = row?.adapter?.get(0) as? CustomRowItemX
-        return firstItem?.layout == "landscape" && firstItem.rowHeader == "bannerAd"
+        return firstItem?.layout == "landscape" && firstItem.rowAdType == "typeAdsBanner"
     }
 
     private fun pauseAutoScroll() {
@@ -182,7 +218,7 @@ class MainViewModel @Inject constructor(
             val itemAdapter = rowAdapter?.adapter as? ArrayObjectAdapter
             if (itemAdapter != null && itemAdapter.size() > 0) {
                 currentAutoScrollItemIndex = (currentAutoScrollItemIndex + 1) % itemAdapter.size()
-                val nextItem = itemAdapter.get(currentAutoScrollItemIndex) as? CustomRowItemX
+                val nextItem = itemAdapter[currentAutoScrollItemIndex] as? CustomRowItemX
                 if (nextItem != null) {
                     Log.d(
                         TAG,
@@ -337,13 +373,13 @@ class MainViewModel @Inject constructor(
     }
 }
 
-data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowHeader: String) {
+data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowAdType: String?) {
     val contentData: ContentData
         get() = ContentData(
             imageUrl = if (layout == "landscape") rowItemX.poster else rowItemX.portrait ?: "",
             width = rowItemX.tileWidth?.toIntOrNull() ?: 300,
             height = rowItemX.tileHeight?.toIntOrNull() ?: 225,
-            isLandscape = layout == "landscape" && rowHeader == "bannerAd",
+            isLandscape = layout == "landscape" && rowAdType == "typeAdsBanner",
             isPortrait = layout == "portrait"
         )
 }

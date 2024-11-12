@@ -1,6 +1,7 @@
 package com.example.leanbackpocmvvm.repository.impl
 
 import com.example.leanbackpocmvvm.core.Resource
+import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.remote.ApiService
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
