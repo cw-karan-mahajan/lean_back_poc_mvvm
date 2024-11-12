@@ -28,18 +28,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private val innerLayout: FrameLayout
     private var videoSurface: Surface? = null
     var isVideoPlaying = false
-    private val focusOverlay: View
     private var thumbnailOverlay: FrameLayout
 
     private var originalWidth: Int = 0
     private var originalHeight: Int = 0
     private var stretchedWidth: Int = 0
     private var stretchedHeight: Int = 0
-    private var exoPlayerManager: ExoPlayerManager? = null
     private lateinit var lifecycleOwner: LifecycleOwner
-    private lateinit var mainViewModel: MainViewModel
     private var isViewAttached = false
-    private var currentImageUrl: String? = null
     var customItem: CustomRowItemX? = null
 
     init {
@@ -47,11 +43,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        isFocusable = true
+        isFocusableInTouchMode = true
+        background = ContextCompat.getDrawable(context, R.drawable.focus_onselect_bg)
 
         innerLayout = FrameLayout(context).apply {
             layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
             setPadding(0, 0, 0, 0)
             clipChildren = false
@@ -59,20 +58,20 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
         thumbnailImageView = ImageView(context).apply {
             layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(3, 6, 3, 6)
+                setMargins(6, 6, 6, 6)
             }
         }
         innerLayout.addView(thumbnailImageView)
 
         posterImageView = ImageView(context).apply {
             layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(3, 6, 3, 6)
+                setMargins(6, 6, 6, 6)
             }
             visibility = View.GONE
         }
@@ -80,42 +79,32 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
 
         videoPlaceholder = FrameLayout(context).apply {
             layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(3, 6, 3, 6)
+                setMargins(6, 6, 6, 6)
             }
             visibility = View.GONE
         }
         innerLayout.addView(videoPlaceholder)
-
-        focusOverlay = View(context).apply {
-            layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            background = ContextCompat.getDrawable(context, R.drawable.focus_onselect_bg)
-            visibility = INVISIBLE
-        }
-        innerLayout.addView(focusOverlay)
 
         addView(innerLayout)
         clipChildren = false
 
         thumbnailOverlay = FrameLayout(context).apply {
             layoutParams = LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
             )
             visibility = View.GONE
         }
         addView(thumbnailOverlay)
 
-        isFocusable = true
-        isFocusableInTouchMode = true
-
         setOnFocusChangeListener { _, hasFocus ->
-            Log.d(TAG, "Focus changed: $hasFocus")
+            Log.d(
+                TAG,
+                "setOnFocusChangeListener hasFocus $hasFocus  isVideoPlaying $isVideoPlaying"
+            )
             updateFocusOverlayVisibility(hasFocus)
             if (hasFocus) {
                 if (isVideoPlaying) {
@@ -124,7 +113,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
                     shrinkCard()
                 }
             } else {
-                shrinkCard()
+                if (!isVideoPlaying)
+                    shrinkCard()
             }
         }
     }
@@ -148,11 +138,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         this.lifecycleOwner = owner
     }
 
-    fun setMainViewModel(viewModel: MainViewModel) {
-        this.mainViewModel = viewModel
-    }
-
-    fun setImage(imageUrl: String?, width: Int, height: Int, isAdImage: Boolean = false) {
+    fun setImage(imageUrl: String?, width: Int, height: Int) {
         GlideApp.with(context).clear(thumbnailImageView)
         GlideApp.with(context).clear(posterImageView)
         thumbnailImageView.setImageDrawable(null)
@@ -171,8 +157,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             setImage(
                 imageUrl,
                 item.contentData.width,
-                item.contentData.height,
-                isAdImage
+                item.contentData.height
             )
         }
     }
@@ -189,18 +174,15 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         }
     }
 
-    fun setExoPlayerManager(manager: ExoPlayerManager) {
-        this.exoPlayerManager = manager
-    }
-
     fun setMainImageDimensions(isReqStretched: Boolean, isPortrait: Boolean, w: Int, h: Int) {
         val width = dpToPx(context, w)
         val height = dpToPx(context, h)
+        val adHeight = dpToPx(context, 640)
         originalWidth = width
         originalHeight = height
 
         stretchedWidth = if (isReqStretched) width else (width * 2.5).toInt()
-        stretchedHeight = if (isReqStretched) 600 else (width * 1.5).toInt()
+        stretchedHeight = if (isReqStretched) adHeight else (width * 1.5).toInt()
 
         resizeCard(false) // Initially set to non-stretched size
     }
@@ -262,9 +244,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         thumbnailImageView.layoutParams = LayoutParams(targetWidth, targetHeight)
         posterImageView.layoutParams = LayoutParams(targetWidth, targetHeight)
         videoPlaceholder.layoutParams = LayoutParams(targetWidth, targetHeight)
-        focusOverlay.layoutParams = LayoutParams(targetWidth, targetHeight)
         thumbnailOverlay.layoutParams = LayoutParams(targetWidth, targetHeight)
-
         updateFocusOverlayVisibility(isFocused)
     }
 
@@ -289,8 +269,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun updateFocusOverlayVisibility(hasFocus: Boolean) {
+        Log.d(TAG, "updateFocusOverlay hasFocus $hasFocus  isVideoPlaying $isVideoPlaying")
         val shouldBeVisible = hasFocus || isVideoPlaying
-        focusOverlay.visibility = if (shouldBeVisible) View.VISIBLE else View.INVISIBLE
+        lifecycleOwner.lifecycleScope.launch {
+            background = if (shouldBeVisible) ContextCompat.getDrawable(
+                context, R.drawable.itemview_background_focused
+            ) else ContextCompat.getDrawable(context, R.drawable.focus_onselect_bg)
+            Log.d(TAG, "updateFocusOverlay " + if (shouldBeVisible) View.VISIBLE else View.INVISIBLE)
+        }
     }
 
     fun resetCardState() {

@@ -3,6 +3,8 @@ package com.example.leanbackpocmvvm.repository.impl
 import android.content.Context
 import android.util.Log
 import com.example.leanbackpocmvvm.core.Resource
+import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
+import com.example.leanbackpocmvvm.remote.VastApiService
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser.VastAd
 import com.example.leanbackpocmvvm.repository.VastRepository
@@ -23,40 +25,59 @@ class VastRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val networkConnectivity: NetworkConnectivity,
     private val httpClient: OkHttpClient,
-    private val adEventTracker: AdEventTracker
+    private val adEventTracker: AdEventTracker,
+    private val dynamicApiServiceFactory: DynamicApiServiceFactory
 ) : VastRepository {
 
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val ongoingOperations = ConcurrentHashMap<String, Job>()
 
-    override suspend fun parseVastAd(vastUrl: String, tileId: String): Flow<Resource<VastAd>> = flow {
+    override suspend fun parseVastAd(vastUrl: String, tileId: String): Flow<Resource<VastAd>> = channelFlow {
         if (!networkConnectivity.isConnected()) {
-            emit(Resource.error<VastAd>("No internet connection"))
-            return@flow
+            send(Resource.error<VastAd>("No internet connection"))
+            return@channelFlow
         }
+
         try {
-            emit(Resource.loading<VastAd>())
-            val operationKey = "parse_$tileId"
-            val job = coroutineScope.launch {
-                val vastAd = withTimeout(TIMEOUT_MS) {
-                    vastParser.parseVastUrl(vastUrl, tileId)
-                }
-                if (vastAd != null) {
-                    emit(Resource.success<VastAd>(vastAd))
-                } else {
-                    emit(Resource.error<VastAd>("Failed to parse VAST XML"))
-                }
+            send(Resource.loading<VastAd>())
+
+            // Make API call to get VAST XML
+            Log.d(TAG, "Fetching VAST XML from URL: $vastUrl")
+            val vastApiService = dynamicApiServiceFactory.createService(VastApiService::class.java, vastUrl)
+            val path = dynamicApiServiceFactory.extractPath(vastUrl)
+            val queryParams = dynamicApiServiceFactory.extractQueryParams(vastUrl)
+
+            val response = vastApiService.getVastXml(path, queryParams)
+            if (!response.isSuccessful) {
+                send(Resource.error<VastAd>("Failed to fetch VAST XML: ${response.code()}"))
+                return@channelFlow
             }
 
-            ongoingOperations[operationKey] = job
-            job.join()
-            ongoingOperations.remove(operationKey)
+            val xmlString = response.body()
+            if (xmlString == null) {
+                send(Resource.error<VastAd>("Empty VAST XML response"))
+                return@channelFlow
+            }
+
+            Log.d(TAG, "Successfully received VAST XML, now parsing...")
+
+            // Parse XML using existing vastParser
+            val vastAd = withTimeout(TIMEOUT_MS) {
+                vastParser.parseVastUrl(vastUrl, tileId)
+            }
+
+            if (vastAd != null) {
+                logVastAdDetails(vastAd)
+                send(Resource.success<VastAd>(vastAd))
+            } else {
+                send(Resource.error<VastAd>("Failed to parse VAST XML"))
+            }
 
         } catch (e: TimeoutCancellationException) {
-            emit(Resource.error<VastAd>("VAST parsing timeout"))
+            send(Resource.error<VastAd>("VAST parsing timeout"))
             Log.e(TAG, "VAST parsing timeout for tileId: $tileId", e)
         } catch (e: Exception) {
-            emit(Resource.error<VastAd>("Error parsing VAST: ${e.message}"))
+            send(Resource.error<VastAd>("Error parsing VAST: ${e.message}"))
             Log.e(TAG, "Error parsing VAST for tileId: $tileId", e)
         }
     }.flowOn(Dispatchers.IO)
@@ -67,13 +88,14 @@ class VastRepositoryImpl @Inject constructor(
             } else false
         }
 
-    override suspend fun trackAdEvent(url: String): Flow<Resource<Boolean>> = flow {
+    override suspend fun trackAdEvent(url: String): Flow<Resource<Boolean>> = channelFlow {
         if (!networkConnectivity.isConnected()) {
-            emit(Resource.error<Boolean>("No internet connection"))
-            return@flow
+            send(Resource.error<Boolean>("No internet connection"))
+            return@channelFlow
         }
+
         try {
-            emit(Resource.loading<Boolean>())
+            send(Resource.loading<Boolean>())
             val request = Request.Builder()
                 .url(url)
                 .build()
@@ -81,14 +103,14 @@ class VastRepositoryImpl @Inject constructor(
             withContext(Dispatchers.IO) {
                 httpClient.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        emit(Resource.success(true))
+                        send(Resource.success(true))
                     } else {
-                        emit(Resource.error<Boolean>("Failed to track event: ${response.code}"))
+                        send(Resource.error<Boolean>("Failed to track event: ${response.code}"))
                     }
                 }
             }
         } catch (e: Exception) {
-            emit(Resource.error<Boolean>("Error tracking event: ${e.message}"))
+            send(Resource.error<Boolean>("Error tracking event: ${e.message}"))
             Log.e(TAG, "Error tracking event", e)
         }
     }.flowOn(Dispatchers.IO)
@@ -99,36 +121,43 @@ class VastRepositoryImpl @Inject constructor(
             } else false
         }
 
-    override suspend fun preloadVastAd(vastUrl: String, tileId: String): Flow<Resource<VastAd>> = flow {
+    override suspend fun preloadVastAd(vastUrl: String, tileId: String): Flow<Resource<VastAd>> = channelFlow {
         if (!networkConnectivity.isConnected()) {
-            emit(Resource.error<VastAd>("No internet connection"))
-            return@flow
+            send(Resource.error<VastAd>("No internet connection"))
+            return@channelFlow
         }
 
         try {
-            emit(Resource.loading<VastAd>())
-            val operationKey = "preload_$tileId"
-            val job = coroutineScope.launch {
-                val vastAd = withTimeout(TIMEOUT_MS) {
-                    vastParser.parseVastUrl(vastUrl, tileId)
-                }
+            send(Resource.loading<VastAd>())
 
-                if (vastAd != null) {
-                    // Preload the first media file
-                    vastAd.mediaFiles.firstOrNull()?.let { mediaFile ->
-                        preloadMedia(mediaFile.url)
-                    }
-                    emit(Resource.success(vastAd))
-                } else {
-                    emit(Resource.error<VastAd>("Failed to preload VAST XML"))
-                }
+            // First fetch VAST XML
+            val vastApiService = dynamicApiServiceFactory.createService(VastApiService::class.java, vastUrl)
+            val path = dynamicApiServiceFactory.extractPath(vastUrl)
+            val queryParams = dynamicApiServiceFactory.extractQueryParams(vastUrl)
+
+            val response = vastApiService.getVastXml(path, queryParams)
+            if (!response.isSuccessful) {
+                send(Resource.error<VastAd>("Failed to fetch VAST XML for preload"))
+                return@channelFlow
             }
-            ongoingOperations[operationKey] = job
-            job.join()
-            ongoingOperations.remove(operationKey)
+
+            // Then parse and preload
+            val vastAd = withTimeout(TIMEOUT_MS) {
+                vastParser.parseVastUrl(vastUrl, tileId)
+            }
+
+            if (vastAd != null) {
+                // Preload the first media file
+                vastAd.mediaFiles.firstOrNull()?.let { mediaFile ->
+                    preloadMedia(mediaFile.url)
+                }
+                send(Resource.success(vastAd))
+            } else {
+                send(Resource.error<VastAd>("Failed to preload VAST XML"))
+            }
 
         } catch (e: Exception) {
-            emit(Resource.error<VastAd>("Error preloading VAST: ${e.message}"))
+            send(Resource.error<VastAd>("Error preloading VAST: ${e.message}"))
             Log.e(TAG, "Error preloading VAST for tileId: $tileId", e)
         }
     }.flowOn(Dispatchers.IO)
@@ -150,6 +179,49 @@ class VastRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.e(TAG, "Error preloading media", e)
         }
+    }
+
+    private fun logVastAdDetails(vastAd: VastAd) {
+        Log.d(TAG, "========== VAST Ad Details ==========")
+        Log.d(TAG, "Ad ID: ${vastAd.id}")
+        Log.d(TAG, "Sequence: ${vastAd.sequence}")
+        Log.d(TAG, "Ad System: ${vastAd.adSystem}")
+        Log.d(TAG, "Ad Title: ${vastAd.adTitle}")
+        Log.d(TAG, "Duration: ${vastAd.duration}")
+
+        // Log MediaFiles
+        Log.d(TAG, "------- MediaFiles (${vastAd.mediaFiles.size}) -------")
+        vastAd.mediaFiles.forEach { mediaFile ->
+            Log.d(TAG, """
+                MediaFile:
+                - URL: ${mediaFile.url}
+                - Bitrate: ${mediaFile.bitrate}
+                - Resolution: ${mediaFile.width}x${mediaFile.height}
+                - Type: ${mediaFile.type}
+                - Delivery: ${mediaFile.delivery}
+            """.trimIndent())
+        }
+
+        // Log Tracking Events
+        Log.d(TAG, "------- Tracking Events -------")
+        vastAd.trackingEvents.forEach { (event, url) ->
+            Log.d(TAG, "Event: $event -> URL: $url")
+        }
+
+        // Log Click Information
+        Log.d(TAG, "------- Click Information -------")
+        Log.d(TAG, "ClickThrough: ${vastAd.clickThrough}")
+        Log.d(TAG, "ClickTracking: ${vastAd.clickTracking}")
+
+        // Log Extensions if any
+        if (vastAd.extensions.isNotEmpty()) {
+            Log.d(TAG, "------- Extensions -------")
+            vastAd.extensions.forEach { (key, value) ->
+                Log.d(TAG, "$key: $value")
+            }
+        }
+
+        Log.d(TAG, "===================================")
     }
 
     override fun clearVastCache() {
@@ -178,3 +250,4 @@ class VastRepositoryImpl @Inject constructor(
         private const val RETRY_DELAY_MS = 1000L // 1 second
     }
 }
+

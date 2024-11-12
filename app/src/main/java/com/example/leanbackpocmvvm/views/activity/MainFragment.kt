@@ -1,6 +1,6 @@
-package com.example.leanbackpocmvvm.views.activity
+/*package com.example.leanbackpocmvvm.views.activity
 
-/*
+
 import android.content.IntentFilter
 import android.graphics.Rect
 import android.net.ConnectivityManager

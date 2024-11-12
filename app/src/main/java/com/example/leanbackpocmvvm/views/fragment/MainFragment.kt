@@ -37,6 +37,7 @@ import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
+import com.example.leanbackpocmvvm.views.viewmodel.AutoScrollCommand
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.UiState
@@ -131,7 +132,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.autoScrollCommand.observe(viewLifecycleOwner) { command ->
-            scrollToItem(command.rowIndex, command.itemIndex)
+            handleAutoScrollCommand(command)
         }
 
         viewModel.shrinkCardCommand.observe(viewLifecycleOwner) { tileId ->
@@ -216,7 +217,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun populateRows(data: MyData2) {
         val lrp = ListRowPresenter(FocusHighlight.ZOOM_FACTOR_NONE, false).apply {
             shadowEnabled = false
-            selectEffectEnabled = false
+            enableChildRoundedCorners(true)
+            selectEffectEnabled = true
         }
         rowsAdapter = ArrayObjectAdapter(lrp)
         val presenter = createCardLayout(viewLifecycleOwner)
@@ -226,7 +228,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             val listRowAdapter = ArrayObjectAdapter(presenter)
 
             row.rowItems.forEach { item ->
-                val customRowItem = CustomRowItemX(item, row.rowLayout, row.rowHeader)
+                val rowAdType = if (row.rowAdConfig != null) row.rowAdConfig.rowAdType else ""
+                val customRowItem = CustomRowItemX(item, row.rowLayout, rowAdType)
                 listRowAdapter.add(customRowItem)
             }
 
@@ -240,7 +243,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun createCardLayout(lifecycleOwner: LifecycleOwner): CardLayout1 {
-        return CardLayout1(lifecycleOwner, exoPlayerManager, viewModel)
+        return CardLayout1(lifecycleOwner)
     }
 
     private fun findItemIndex(listRow: ListRow?, item: CustomRowItemX): Int {
@@ -249,21 +252,28 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         return (0 until adapter.size()).firstOrNull { adapter.get(it) == item } ?: -1
     }
 
-    private fun scrollToItem(rowIndex: Int, itemIndex: Int) {
+    private fun handleAutoScrollCommand(command: AutoScrollCommand) {
         view?.post {
-            val verticalGridView =
-                view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
-            verticalGridView?.smoothScrollToPosition(rowIndex)
+            val verticalGridView = view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
+            verticalGridView?.smoothScrollToPosition(command.rowIndex)
 
             verticalGridView?.postDelayed({
-                val rowView = findRowView(verticalGridView, rowIndex)
-                val horizontalGridView =
-                    rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
-                horizontalGridView?.smoothScrollToPosition(itemIndex)
+                val rowView = findRowView(verticalGridView, command.rowIndex)
+                val horizontalGridView = rowView?.findViewById<HorizontalGridView>(androidx.leanback.R.id.row_content)
 
-                horizontalGridView?.postDelayed({
-                    focusOnItem(horizontalGridView, itemIndex)
-                }, 200)
+                if (command.isJumping) {
+                    // Immediately jump to the first item
+                    horizontalGridView?.scrollToPosition(command.itemIndex)
+                    horizontalGridView?.post {
+                        focusOnItem(horizontalGridView, command.itemIndex)
+                    }
+                } else {
+                    // Smooth scroll to the next item
+                    horizontalGridView?.smoothScrollToPosition(command.itemIndex)
+                    horizontalGridView?.postDelayed({
+                        focusOnItem(horizontalGridView, command.itemIndex)
+                    }, 200)
+                }
             }, 200)
         }
     }
@@ -298,9 +308,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                     Log.e(TAG, "VerticalGridView not found")
                     return
                 }
-
                 Log.d(TAG, "VerticalGridView found, observing changes")
-
                 observeVerticalGridView(verticalGridView)
             }
         })
@@ -449,120 +457,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
     }
 
-
-    // This method retrieves only fully visible items, not partially.
-    /* private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
-         val layoutManager = verticalGridView.layoutManager
-         if (layoutManager == null) {
-             Log.e(TAG, "LayoutManager is null, retrying...")
-             verticalGridView.post { updateVisibleItemsCount(verticalGridView) }
-             return
-         }
-
-         Log.d(TAG, "LayoutManager type: ${layoutManager.javaClass.simpleName}")
-
-         val itemCount = verticalGridView.adapter?.itemCount ?: 0
-         Log.d(TAG, "Total row count: $itemCount")
-
-         val visibleRowCount = verticalGridView.childCount
-         Log.d(TAG, "Visible row count: $visibleRowCount")
-
-         var fullyVisibleItemsCount = 0
-
-         for (i in 0 until visibleRowCount) {
-             val rowView = verticalGridView.getChildAt(i)
-             Log.d(TAG, "Row $i view type: ${rowView.javaClass.simpleName}")
-
-             // Find the HorizontalGridView within the row
-             val horizontalGridView = findHorizontalGridView(rowView)
-
-             if (horizontalGridView != null) {
-                 val rowAdapter = horizontalGridView.adapter
-                 val rowItemCount = rowAdapter?.itemCount ?: 0
-                 val rowVisibleItemCount = horizontalGridView.childCount
-
-                 var rowFullyVisibleItemsCount = 0
-                 // Count fully visible items in this row
-                 for (j in 0 until rowVisibleItemCount) {
-                     val itemView = horizontalGridView.getChildAt(j)
-                     if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
-                         rowFullyVisibleItemsCount++
-                     }
-                 }
-
-                 fullyVisibleItemsCount += rowFullyVisibleItemsCount
-
-                 Log.d(
-                     TAG,
-                     "Row $i - Total items: $rowItemCount, Fully visible items: $rowFullyVisibleItemsCount"
-                 )
-             } else {
-                 Log.d(TAG, "Row $i - HorizontalGridView not found")
-             }
-         }
-
-         Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
-
-         // Log the height of the VerticalGridView
-         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
-     } */
-
-
-    // This method retrieves all visible items, whether fully or partially.
-    /* private fun updateVisibleItemsCount(verticalGridView: VerticalGridView) {
-         val layoutManager = verticalGridView.layoutManager
-         if (layoutManager == null) {
-             Log.e(TAG, "LayoutManager is null, retrying...")
-             verticalGridView.post { updateVisibleItemsCount(verticalGridView) }
-             return
-         }
-
-         Log.d(TAG, "LayoutManager type: ${layoutManager.javaClass.simpleName}")
-
-         val itemCount = verticalGridView.adapter?.itemCount ?: 0
-         Log.d(TAG, "Total row count: $itemCount")
-
-         val visibleRowCount = verticalGridView.childCount
-         Log.d(TAG, "Visible row count: $visibleRowCount")
-
-         var totalVisibleItemsCount = 0
-         var fullyVisibleItemsCount = 0
-
-         for (i in 0 until visibleRowCount) {
-             val rowView = verticalGridView.getChildAt(i)
-             Log.d(TAG, "Row $i view type: ${rowView.javaClass.simpleName}")
-
-             // Find the HorizontalGridView within the row
-             val horizontalGridView = findHorizontalGridView(rowView)
-
-             if (horizontalGridView != null) {
-                 val rowAdapter = horizontalGridView.adapter
-                 val rowItemCount = rowAdapter?.itemCount ?: 0
-                 val rowVisibleItemCount = horizontalGridView.childCount
-
-                 totalVisibleItemsCount += rowVisibleItemCount
-
-                 // Count fully visible items in this row
-                 for (j in 0 until rowVisibleItemCount) {
-                     val itemView = horizontalGridView.getChildAt(j)
-                     if (itemView != null && isViewFullyVisible(horizontalGridView, itemView)) {
-                         fullyVisibleItemsCount++
-                     }
-                 }
-
-                 Log.d(TAG, "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount")
-             } else {
-                 Log.d(TAG, "Row $i - HorizontalGridView not found")
-             }
-         }
-
-         Log.d(TAG, "Total visible items across all rows: $totalVisibleItemsCount")
-         Log.d(TAG, "Fully visible items across all rows: $fullyVisibleItemsCount")
-
-         // Log the height of the VerticalGridView
-         Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
-     } */
-
     private fun findHorizontalGridView(view: View): HorizontalGridView? {
         if (view is HorizontalGridView) {
             return view
@@ -578,23 +472,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
         return null
     }
-
-    /* This ensures that we only count an item as fully or partially visible if its entire area
-       unction ensures that we only count items that are completely within the bounds of their parent
-       HorizontalGridView. */
-
-    /* private fun isViewFullyVisible(parent: ViewGroup, view: View): Boolean {
-        val parentBounds = Rect()
-        val viewBounds = Rect()
-
-        parent.getGlobalVisibleRect(parentBounds)
-        view.getGlobalVisibleRect(viewBounds)
-
-        return viewBounds.left >= parentBounds.left &&
-                viewBounds.right <= parentBounds.right &&
-                viewBounds.top >= parentBounds.top &&
-                viewBounds.bottom <= parentBounds.bottom
-    } */
 
     /* This ensures that we only count an item as fully visible if its entire area is within the
      parent's bounds and no part of it is cut off. */

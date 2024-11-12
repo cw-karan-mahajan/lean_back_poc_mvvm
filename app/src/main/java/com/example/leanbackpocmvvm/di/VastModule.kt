@@ -1,6 +1,7 @@
 package com.example.leanbackpocmvvm.di
 
 import android.content.Context
+import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.repository.VastRepository
 import com.example.leanbackpocmvvm.repository.impl.VastRepositoryImpl
@@ -68,14 +69,16 @@ object VastModule {
         @ApplicationContext context: Context,
         networkConnectivity: NetworkConnectivity,
         okHttpClient: OkHttpClient,
-        adEventTracker: AdEventTracker
+        adEventTracker: AdEventTracker,
+        dynamicApiServiceFactory: DynamicApiServiceFactory
     ): VastRepository {
         return VastRepositoryImpl(
             vastParser = vastParser,
             context = context,
             networkConnectivity = networkConnectivity,
             httpClient = okHttpClient,
-            adEventTracker = adEventTracker
+            adEventTracker = adEventTracker,
+            dynamicApiServiceFactory = dynamicApiServiceFactory
         )
     }
 
@@ -116,34 +119,13 @@ object VastModule {
     @Provides
     @Singleton
     fun provideVastErrorHandler(): VastErrorHandler {
-        return VastErrorHandler(
-            maxErrorLogSize = 100,
-            shouldRetryOnError = { error ->
-                when (error) {
-                    is IOException,
-                    is SocketTimeoutException,
-                    is ConnectException -> true
-                    else -> false
-                }
-            }
-        )
+        return VastErrorHandler()
     }
 
     @Provides
     @Singleton
     fun provideVastXmlValidator(): VastXmlValidator {
-        return VastXmlValidator(
-            supportedVersions = setOf("2.0", "3.0", "4.0", "4.1"),
-            requiredElements = setOf(
-                "VAST",
-                "Ad",
-                "InLine",
-                "Creative",
-                "Linear",
-                "MediaFiles"
-            ),
-            maxMediaFileSize = 100 * 1024 * 1024 // 100MB
-        )
+        return VastXmlValidator()  // No parameters needed
     }
 
     @Provides

@@ -1,3 +1,4 @@
+/*
 package com.example.leanbackpocmvvm.views.customview
 
 import android.content.Context
@@ -172,7 +173,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         if (imageUrl != null) {
             loadRegularImage(mImageUrl, width, height)
         }
-        /*if (isAdImage) {
+        */
+/*if (isAdImage) {
             if (imageUrl != null) {
                 loadAdImage(mImageUrl, width, height)
             } else {
@@ -184,7 +186,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             } else {
                 // Set a placeholder image here if needed
             }
-        }*/
+        }*//*
+
     }
 
     private fun loadCurrentImage() {
@@ -350,4 +353,4 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     companion object {
         const val TAG = "NewVideoCardView"
     }
-}
+}*/

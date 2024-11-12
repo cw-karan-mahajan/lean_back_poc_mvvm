@@ -26,7 +26,7 @@ class YourAppGlideModule : AppGlideModule() {
             .centerInside()
             .diskCacheStrategy(DiskCacheStrategy.RESOURCE)
             .skipMemoryCache(true)
-            .error(R.drawable.movie)
+            .error(R.drawable.app_icon_your_company)
             .format(DecodeFormat.PREFER_RGB_565)
         builder.setDefaultRequestOptions(rq)
     }

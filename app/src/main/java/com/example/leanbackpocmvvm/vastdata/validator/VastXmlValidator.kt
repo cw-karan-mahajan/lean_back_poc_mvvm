@@ -8,8 +8,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class VastXmlValidator @Inject constructor(
-    private val supportedVersions: Set<String> = setOf("2.0", "3.0", "4.0", "4.1"),
+class VastXmlValidator @Inject constructor() {
+
+    private val supportedVersions: Set<String> = setOf("2.0", "3.0", "4.0", "4.1")
     private val requiredElements: Set<String> = setOf(
         "VAST",
         "Ad",
@@ -17,9 +18,9 @@ class VastXmlValidator @Inject constructor(
         "Creative",
         "Linear",
         "MediaFiles"
-    ),
+    )
     private val maxMediaFileSize: Long = 100 * 1024 * 1024 // 100MB
-) {
+
     sealed class ValidationResult {
         object Valid : ValidationResult()
         data class Invalid(val errors: List<ValidationError>) : ValidationResult()

@@ -1,10 +1,13 @@
+/*
 package com.example.leanbackpocmvvm.views.presenter
 
 import android.view.ViewGroup
 import androidx.annotation.OptIn
+import androidx.core.content.ContextCompat
 import androidx.leanback.widget.Presenter
 import androidx.lifecycle.LifecycleOwner
 import androidx.media3.common.util.UnstableApi
+import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
@@ -14,7 +17,9 @@ import com.example.leanbackpocmvvm.views.activity.MainActivity
 
 @UnstableApi
 class CardLayout1(
-    private val lifecycleOwner: LifecycleOwner
+    private val lifecycleOwner: LifecycleOwner,
+    private val exoPlayerManager: ExoPlayerManager,
+    private val mainViewModel: MainViewModel
 ) : Presenter() {
 
     class CustomViewHolder(val cardView: NewVideoCardView) : Presenter.ViewHolder(cardView) {
@@ -27,7 +32,10 @@ class CardLayout1(
                 isFocusable = true
                 isFocusableInTouchMode = true
                 setLifecycleOwner(lifecycleOwner)
+                setExoPlayerManager(exoPlayerManager)
+                setMainViewModel(mainViewModel)
             }
+
         return CustomViewHolder(cardView)
     }
 
@@ -47,7 +55,8 @@ class CardLayout1(
                     cardView.setImage(
                         imageUrl,
                         customItem.contentData.width,
-                        customItem.contentData.height
+                        customItem.contentData.height,
+                        isAdImage
                     )
                     cardView.setMainImageDimensions(
                         customItem.contentData.isLandscape,
@@ -70,7 +79,7 @@ class CardLayout1(
         try {
             GlideApp.with(cardView.context).clear(cardView)
         } catch (e: IllegalArgumentException) {
-             //Activity was already destroyed, ignore
+            //Activity was already destroyed, ignore
         }
     }
-}
+}*/

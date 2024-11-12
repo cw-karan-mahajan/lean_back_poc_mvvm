@@ -9,9 +9,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class VastErrorHandler @Inject constructor(
-    private val maxErrorLogSize: Int = 100,
-    private val shouldRetryOnError: (Throwable) -> Boolean = { error ->
+class VastErrorHandler @Inject constructor() {  // Remove parameters from primary constructor
+
+    private val maxErrorLogSize: Int = 100  // Move as property
+    private val shouldRetryOnError: (Throwable) -> Boolean = { error ->  // Move as property
         when (error) {
             is IOException,
             is SocketTimeoutException,
@@ -19,7 +20,6 @@ class VastErrorHandler @Inject constructor(
             else -> false
         }
     }
-) {
     private val errorLog = ConcurrentLinkedQueue<ErrorEntry>()
 
     data class ErrorEntry(
