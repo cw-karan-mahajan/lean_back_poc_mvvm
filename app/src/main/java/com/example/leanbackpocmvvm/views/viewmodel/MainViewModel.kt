@@ -79,9 +79,14 @@ class MainViewModel @Inject constructor(
     private val VIDEO_START_DELAY = 5000L
     private val USER_IDLE_DELAY = 5000L
     var mRowsAdapter: ArrayObjectAdapter? = null
-    private val _fullyVisibleTileIds = mutableSetOf<String>()
+    private val _fullyVisibleTileIds = Collections.synchronizedSet(mutableSetOf<String>())
     private val _playedVideoTileIds = mutableSetOf<String>()
     val playedVideoTileIds: Set<String> = _playedVideoTileIds
+
+    private val _pendingImpressions = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
+    private val _trackedImpressionTileIds = Collections.synchronizedSet(mutableSetOf<String>())
+    private var impressionTrackingJob: Job? = null
+    private var currentlyPlayingAdTileId: String? = null
 
     fun loadData() {
         viewModelScope.launch {
@@ -368,11 +373,37 @@ class MainViewModel @Inject constructor(
 
     fun onVideoEnded(tileId: String) {
         handleVideoEnded(tileId)
+        currentlyPlayingAdTileId = null
     }
 
-    fun addFullyVisibleTileId(tileId: String) {
-        if (_fullyVisibleTileIds.add(tileId)) {
-            Log.d(TAG, "Added new fully visible tile ID: $tileId")
+    fun onUserFocus(item: CustomRowItemX) {
+        // Check if this tile's impression hasn't been tracked yet
+        if (_trackedImpressionTileIds.add(item.rowItemX.tid)) {
+            item.rowItemX.adsServer?.let { adsServerUrl ->
+                Log.d(TAG, "Tracking impression for focused tile: ${item.rowItemX.tid}")
+                val impTrackerUrls = adRepository.getImpressionTrackerUrls(adsServerUrl)
+                impTrackerUrls.forEach { impTrackerUrl ->
+                    Log.d(TAG, "impTrackerUrl: $impTrackerUrl")
+                    _pendingImpressions.add(item.rowItemX.tid to impTrackerUrl)
+                }
+                if (impTrackerUrls.isNotEmpty()) {
+                    scheduleImpressionTracking()
+                }
+            }
+        }
+    }
+
+    fun addFullyVisibleTileId(tileId: String, customItem: CustomRowItemX?) {
+        if (_fullyVisibleTileIds.add(tileId) && _trackedImpressionTileIds.add(tileId)) {
+            customItem?.rowItemX?.adsServer?.let { adsServerUrl ->
+                Log.d(TAG, "Added new fully visible tile ID: $tileId")
+                // Get the impression tracker URLs for this ads_server URL
+                val impTrackerUrls = adRepository.getImpressionTrackerUrls(adsServerUrl)
+                impTrackerUrls.forEach { impTrackerUrl ->
+                    _pendingImpressions.add(tileId to impTrackerUrl)
+                }
+                scheduleImpressionTracking()
+            }
         }
     }
 
@@ -449,6 +480,48 @@ class MainViewModel @Inject constructor(
         } else {
             item.rowItemX.videoUrl?.let { videoUrl ->
                 _preloadVideoCommand.value = PreloadVideoCommand(videoUrl)
+            }
+        }
+    }
+
+    private fun scheduleImpressionTracking() {
+        if (impressionTrackingJob?.isActive != true) {
+            impressionTrackingJob = viewModelScope.launch {
+                delay(100) // Small delay to batch impressions
+                trackPendingImpressions()
+            }
+        }
+    }
+
+    private suspend fun trackPendingImpressions() {
+        val impressions = _pendingImpressions.toList()
+        _pendingImpressions.clear()
+
+        if (impressions.isNotEmpty()) {
+            try {
+                val results = adRepository.trackImpressions(impressions)
+                results.forEach { (tileId, result) ->
+                    when (result) {
+                        is Resource.Success -> {
+                            Log.d(TAG, "Impression tracked successfully for tile: $tileId")
+                        }
+
+                        is Resource.Error -> {
+                            Log.e(
+                                TAG,
+                                "Failed to track impression for tile: $tileId. Error: ${result.message}"
+                            )
+                            // If tracking failed, we might want to re-add to pending impressions
+                            _pendingImpressions.add(tileId to impressions.first { it.first == tileId }.second)
+                        }
+
+                        else -> {}
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error tracking impressions: ${e.message}", e)
+                // Re-add all impressions back to the pending list
+                _pendingImpressions.addAll(impressions)
             }
         }
     }

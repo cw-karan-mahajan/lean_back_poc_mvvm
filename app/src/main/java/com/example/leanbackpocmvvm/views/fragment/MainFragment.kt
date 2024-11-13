@@ -24,7 +24,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -82,8 +81,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
             useController = false
+            controllerAutoShow = false
         }
 
         return view
@@ -143,6 +142,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         viewModel.resetCardCommand.observe(viewLifecycleOwner) { tileId ->
             val cardToReset = view?.findViewWithTag<NewVideoCardView>(tileId)
+            cardToReset?.isVideoPlaying = false
             cardToReset?.resetCardState()
         }
 
@@ -155,7 +155,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         }
 
         viewModel.preloadVideoCommand.observe(viewLifecycleOwner) { command ->
-            exoPlayerManager.preloadVideo(command.videoUrl)
+            //exoPlayerManager.preloadVideo(command.videoUrl)
         }
     }
 
@@ -192,7 +192,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                     if (cardView != null) {
                         val rowIndex = rowsAdapter.indexOf(row)
                         val itemIndex = findItemIndex(row as? ListRow, item)
+                        viewModel.onUserFocus(item)
                         viewModel.onItemFocused(item, rowIndex, itemIndex)
+                        stopVideoPlayback()
                     }
                 }
 
@@ -406,10 +408,12 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                                 rowFullyVisibleItemsCount++
                                 val cardView = itemView as? NewVideoCardView
                                 cardView?.customItem?.rowItemX?.tid?.let { tileId ->
-                                    viewModel.addFullyVisibleTileId(tileId)
+                                    viewModel.addFullyVisibleTileId(tileId, cardView.customItem)
                                 }
                             }
-                            isViewPartiallyVisible(horizontalGridView, itemView) -> rowPartiallyVisibleItemsCount++
+
+                            isViewPartiallyVisible(horizontalGridView, itemView) ->
+                                rowPartiallyVisibleItemsCount++
                         }
                     }
                     Log.d(
