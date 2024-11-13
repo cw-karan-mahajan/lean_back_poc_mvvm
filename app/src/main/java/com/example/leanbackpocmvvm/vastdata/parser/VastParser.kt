@@ -14,7 +14,7 @@ import javax.inject.Singleton
 @Singleton
 class VastParser @Inject constructor() {
 
-    private val vastCache = LruCache<String, VastAd>(20) // Cache up to 20 parsed VAST responses
+    private val vastCache = LruCache<String, List<VastAd>>(20)
 
     data class VastAd(
         val id: String,
@@ -48,11 +48,11 @@ class VastParser @Inject constructor() {
         val delivery: String
     )
 
-    suspend fun parseVastUrl(vastUrl: String, tileId: String): VastAd? {
+    suspend fun parseVastUrl(vastUrl: String, tileId: String): List<VastAd>? {
         return withContext(Dispatchers.IO) {
             try {
                 // Check cache first
-                vastCache.get(tileId)?.let {
+                vastCache[tileId]?.let {
                     Log.d(TAG, "Cache hit for tileId: $tileId")
                     return@withContext it
                 }
@@ -65,12 +65,12 @@ class VastParser @Inject constructor() {
                 }
 
                 connection.getInputStream().use { stream ->
-                    val vastAd = parseVastXml(stream)
-                    vastAd?.let {
+                    val vastAds = parseVastXml(stream)
+                    vastAds?.let {
                         vastCache.put(tileId, it)
-                        Log.d(TAG, "Successfully parsed and cached VAST for tileId: $tileId")
+                        Log.d(TAG, "Successfully parsed and cached ${it.size} VAST ads for tileId: $tileId")
                     }
-                    vastAd
+                    vastAds
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error parsing VAST URL: ${e.message}", e)
@@ -79,7 +79,7 @@ class VastParser @Inject constructor() {
         }
     }
 
-    private fun parseVastXml(inputStream: InputStream): VastAd? {
+    private fun parseVastXml(inputStream: InputStream): List<VastAd>? {
         try {
             val factory = XmlPullParserFactory.newInstance()
             val parser = factory.newPullParser()
@@ -87,22 +87,11 @@ class VastParser @Inject constructor() {
             parser.setInput(inputStream, null)
 
             var eventType = parser.eventType
-            var vastAd: VastAd? = null
+            val vastAds = mutableListOf<VastAd>()
             var currentTag = ""
 
-            // Temporary holders for building VastAd
-            var id = ""
-            var sequence = 0
-            var adSystem = ""
-            var adTitle = ""
-            var impression = ""
-            var creativeId = ""
-            var duration = ""
-            var mediaFiles = mutableListOf<MediaFile>()
-            val trackingEvents = mutableMapOf<String, String>()
-            var clickThrough: String? = null
-            var clickTracking: String? = null
-            val extensions = mutableMapOf<String, String>()
+            // Temporary holders for each ad
+            var currentAd = AdBuilder()
 
             while (eventType != XmlPullParser.END_DOCUMENT) {
                 when (eventType) {
@@ -110,58 +99,59 @@ class VastParser @Inject constructor() {
                         currentTag = parser.name
                         when (currentTag) {
                             "Ad" -> {
-                                id = parser.getAttributeValue(null, "id") ?: ""
-                                sequence = parser.getAttributeValue(null, "sequence")?.toIntOrNull() ?: 0
+                                currentAd = AdBuilder()
+                                currentAd.id = parser.getAttributeValue(null, "id") ?: ""
+                                currentAd.sequence = parser.getAttributeValue(null, "sequence")?.toIntOrNull() ?: 0
+                                Log.d(TAG, "Started parsing Ad ID: ${currentAd.id}, Sequence: ${currentAd.sequence}")
                             }
-                            "AdSystem" -> adSystem = parser.nextText()
-                            "AdTitle" -> adTitle = parser.nextText()
-                            "Impression" -> impression = getCleanCdataContent(parser)
-                            "Creative" -> creativeId = parser.getAttributeValue(null, "id") ?: ""
-                            "Duration" -> duration = parser.nextText()
+                            "AdSystem" -> currentAd.adSystem = parser.nextText()
+                            "AdTitle" -> currentAd.adTitle = parser.nextText()
+                            "Impression" -> currentAd.impression = getCleanCdataContent(parser)
+                            "Creative" -> currentAd.creativeId = parser.getAttributeValue(null, "id") ?: ""
+                            "Duration" -> currentAd.duration = parser.nextText()
                             "MediaFile" -> {
                                 val mediaFile = parseMediaFile(parser)
-                                mediaFiles.add(mediaFile)
+                                if (mediaFile.url.isNotEmpty()) {
+                                    currentAd.mediaFiles.add(mediaFile)
+                                    Log.d(TAG, "Added MediaFile: $mediaFile")
+                                }
                             }
                             "Tracking" -> {
                                 val event = parser.getAttributeValue(null, "event")
                                 if (event != null) {
-                                    trackingEvents[event] = getCleanCdataContent(parser)
+                                    currentAd.trackingEvents[event] = getCleanCdataContent(parser)
                                 }
                             }
-                            "ClickThrough" -> clickThrough = getCleanCdataContent(parser)
-                            "ClickTracking" -> clickTracking = getCleanCdataContent(parser)
+                            "ClickThrough" -> currentAd.clickThrough = getCleanCdataContent(parser)
+                            "ClickTracking" -> currentAd.clickTracking = getCleanCdataContent(parser)
                             "Extension" -> {
                                 val type = parser.getAttributeValue(null, "type")
                                 if (type != null) {
-                                    parseExtension(parser, type, extensions)
+                                    parseExtension(parser, type, currentAd.extensions)
                                 }
                             }
                         }
                     }
                     XmlPullParser.END_TAG -> {
                         if (parser.name == "Ad") {
-                            vastAd = VastAd(
-                                id = id,
-                                sequence = sequence,
-                                adSystem = adSystem,
-                                adTitle = adTitle,
-                                impression = impression,
-                                creativeId = creativeId,
-                                duration = duration,
-                                mediaFiles = mediaFiles.toList(),
-                                trackingEvents = trackingEvents.toMap(),
-                                clickThrough = clickThrough,
-                                clickTracking = clickTracking,
-                                extensions = extensions.toMap()
-                            )
-                            break // We've found our Ad, no need to continue parsing
+                            currentAd.build()?.let { ad ->
+                                vastAds.add(ad)
+                                Log.d(TAG, """
+                                    Completed parsing Ad:
+                                    ID: ${ad.id}
+                                    Sequence: ${ad.sequence}
+                                    Title: ${ad.adTitle}
+                                    MediaFiles: ${ad.mediaFiles.size}
+                                """.trimIndent())
+                            }
                         }
                     }
                 }
                 eventType = parser.next()
             }
 
-            return vastAd
+            Log.d(TAG, "Total Ads parsed: ${vastAds.size}")
+            return vastAds.sortedBy { it.sequence }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing VAST XML: ${e.message}", e)
             return null
@@ -169,15 +159,26 @@ class VastParser @Inject constructor() {
     }
 
     private fun parseMediaFile(parser: XmlPullParser): MediaFile {
+        val attributes = mutableMapOf<String, String>()
+        // Get all attributes first
+        for (i in 0 until parser.attributeCount) {
+            attributes[parser.getAttributeName(i)] = parser.getAttributeValue(i)
+        }
+
         val url = getCleanCdataContent(parser)
+        Log.d(TAG, "Parsing MediaFile - URL: $url")
+        Log.d(TAG, "MediaFile attributes: $attributes")
+
         return MediaFile(
             url = url,
-            bitrate = parser.getAttributeValue(null, "bitrate")?.toIntOrNull() ?: 0,
-            width = parser.getAttributeValue(null, "width")?.toIntOrNull() ?: 0,
-            height = parser.getAttributeValue(null, "height")?.toIntOrNull() ?: 0,
-            type = parser.getAttributeValue(null, "type") ?: "",
-            delivery = parser.getAttributeValue(null, "delivery") ?: ""
-        )
+            bitrate = attributes["bitrate"]?.toIntOrNull() ?: 0,
+            width = attributes["width"]?.toIntOrNull() ?: 0,
+            height = attributes["height"]?.toIntOrNull() ?: 0,
+            type = attributes["type"] ?: "",
+            delivery = attributes["delivery"] ?: ""
+        ).also {
+            Log.d(TAG, "Created MediaFile: $it")
+        }
     }
 
     private fun parseExtension(parser: XmlPullParser, type: String, extensions: MutableMap<String, String>) {
@@ -191,10 +192,45 @@ class VastParser @Inject constructor() {
                     if (currentTag != "Extension") {
                         val value = parser.nextText()
                         extensions["${type}_${currentTag}"] = value
+                        Log.d(TAG, "Added extension: ${type}_${currentTag} = $value")
                     }
                 }
             }
             eventType = parser.next()
+        }
+    }
+
+    private class AdBuilder {
+        var id: String = ""
+        var sequence: Int = 0
+        var adSystem: String = ""
+        var adTitle: String = ""
+        var impression: String = ""
+        var creativeId: String = ""
+        var duration: String = ""
+        val mediaFiles = mutableListOf<MediaFile>()
+        val trackingEvents = mutableMapOf<String, String>()
+        var clickThrough: String? = null
+        var clickTracking: String? = null
+        val extensions = mutableMapOf<String, String>()
+
+        fun build(): VastAd? {
+            return if (id.isNotEmpty()) {
+                VastAd(
+                    id = id,
+                    sequence = sequence,
+                    adSystem = adSystem,
+                    adTitle = adTitle,
+                    impression = impression,
+                    creativeId = creativeId,
+                    duration = duration,
+                    mediaFiles = mediaFiles.toList(),
+                    trackingEvents = trackingEvents.toMap(),
+                    clickThrough = clickThrough,
+                    clickTracking = clickTracking,
+                    extensions = extensions.toMap()
+                )
+            } else null
         }
     }
 

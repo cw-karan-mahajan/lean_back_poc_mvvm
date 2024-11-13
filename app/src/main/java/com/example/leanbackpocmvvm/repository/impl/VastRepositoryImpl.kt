@@ -6,7 +6,6 @@ import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.remote.VastApiService
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
-import com.example.leanbackpocmvvm.vastdata.parser.VastParser.VastAd
 import com.example.leanbackpocmvvm.repository.VastRepository
 import com.example.leanbackpocmvvm.vastdata.tracking.AdEventTracker
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
@@ -15,6 +14,9 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okio.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,14 +34,14 @@ class VastRepositoryImpl @Inject constructor(
     private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val ongoingOperations = ConcurrentHashMap<String, Job>()
 
-    override suspend fun parseVastAd(vastUrl: String, tileId: String): Flow<Resource<VastAd>> = channelFlow {
+    override suspend fun parseVastAd(vastUrl: String, tileId: String): Flow<Resource<List<VastParser.VastAd>>> = channelFlow {
         if (!networkConnectivity.isConnected()) {
-            send(Resource.error<VastAd>("No internet connection"))
+            send(Resource.error("No internet connection"))
             return@channelFlow
         }
 
         try {
-            send(Resource.loading<VastAd>())
+            send(Resource.loading())
 
             // Make API call to get VAST XML
             Log.d(TAG, "Fetching VAST XML from URL: $vastUrl")
@@ -49,36 +51,38 @@ class VastRepositoryImpl @Inject constructor(
 
             val response = vastApiService.getVastXml(path, queryParams)
             if (!response.isSuccessful) {
-                send(Resource.error<VastAd>("Failed to fetch VAST XML: ${response.code()}"))
+                send(Resource.error("Failed to fetch VAST XML: ${response.code()}"))
                 return@channelFlow
             }
 
             val xmlString = response.body()
             if (xmlString == null) {
-                send(Resource.error<VastAd>("Empty VAST XML response"))
+                send(Resource.error("Empty VAST XML response"))
                 return@channelFlow
             }
 
             Log.d(TAG, "Successfully received VAST XML, now parsing...")
 
             // Parse XML using existing vastParser
-            val vastAd = withTimeout(TIMEOUT_MS) {
+            val vastAds = withTimeout(TIMEOUT_MS) {
                 vastParser.parseVastUrl(vastUrl, tileId)
             }
 
-            if (vastAd != null) {
-                logVastAdDetails(vastAd)
-                send(Resource.success<VastAd>(vastAd))
+            if (!vastAds.isNullOrEmpty()) {
+                Log.d(TAG, "Successfully parsed ${vastAds.size} VAST ads")
+                vastAds.forEachIndexed { index, vastAd ->
+                    Log.d(TAG, "Processing Ad ${index + 1} of ${vastAds.size}")
+                    logVastAdDetails(vastAd)
+                }
+                send(Resource.success(vastAds))
             } else {
-                send(Resource.error<VastAd>("Failed to parse VAST XML"))
+                send(Resource.error("Failed to parse VAST XML"))
             }
 
         } catch (e: TimeoutCancellationException) {
-            send(Resource.error<VastAd>("VAST parsing timeout"))
-            Log.e(TAG, "VAST parsing timeout for tileId: $tileId", e)
+            send(Resource.error("VAST parsing timeout"))
         } catch (e: Exception) {
-            send(Resource.error<VastAd>("Error parsing VAST: ${e.message}"))
-            Log.e(TAG, "Error parsing VAST for tileId: $tileId", e)
+            send(Resource.error("Error parsing VAST: ${e.message}"))
         }
     }.flowOn(Dispatchers.IO)
         .retryWhen { cause, attempt ->
@@ -121,14 +125,14 @@ class VastRepositoryImpl @Inject constructor(
             } else false
         }
 
-    override suspend fun preloadVastAd(vastUrl: String, tileId: String): Flow<Resource<VastAd>> = channelFlow {
+    override suspend fun preloadVastAd(vastUrl: String, tileId: String): Flow<Resource<List<VastParser.VastAd>>> = channelFlow {
         if (!networkConnectivity.isConnected()) {
-            send(Resource.error<VastAd>("No internet connection"))
+            send(Resource.error("No internet connection"))
             return@channelFlow
         }
 
         try {
-            send(Resource.loading<VastAd>())
+            send(Resource.loading())
 
             // First fetch VAST XML
             val vastApiService = dynamicApiServiceFactory.createService(VastApiService::class.java, vastUrl)
@@ -137,28 +141,30 @@ class VastRepositoryImpl @Inject constructor(
 
             val response = vastApiService.getVastXml(path, queryParams)
             if (!response.isSuccessful) {
-                send(Resource.error<VastAd>("Failed to fetch VAST XML for preload"))
+                send(Resource.error("Failed to fetch VAST XML for preload"))
                 return@channelFlow
             }
 
             // Then parse and preload
-            val vastAd = withTimeout(TIMEOUT_MS) {
+            val vastAds = withTimeout(TIMEOUT_MS) {
                 vastParser.parseVastUrl(vastUrl, tileId)
             }
 
-            if (vastAd != null) {
-                // Preload the first media file
-                vastAd.mediaFiles.firstOrNull()?.let { mediaFile ->
-                    preloadMedia(mediaFile.url)
+            if (!vastAds.isNullOrEmpty()) {
+                // Preload the first media file of each ad
+                vastAds.forEach { vastAd ->
+                    vastAd.mediaFiles.firstOrNull()?.let { mediaFile ->
+                        preloadMedia(mediaFile.url)
+                    }
                 }
-                send(Resource.success(vastAd))
+                send(Resource.success(vastAds))
             } else {
-                send(Resource.error<VastAd>("Failed to preload VAST XML"))
+                send(Resource.error("Failed to preload VAST XML"))
             }
 
         } catch (e: Exception) {
-            send(Resource.error<VastAd>("Error preloading VAST: ${e.message}"))
             Log.e(TAG, "Error preloading VAST for tileId: $tileId", e)
+            send(Resource.error("Error preloading VAST: ${e.message}"))
         }
     }.flowOn(Dispatchers.IO)
 
@@ -173,6 +179,8 @@ class VastRepositoryImpl @Inject constructor(
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
                         Log.w(TAG, "Failed to preload media: ${response.code}")
+                    } else {
+                        Log.d(TAG, "Successfully preloaded media: $url")
                     }
                 }
             }
@@ -181,7 +189,7 @@ class VastRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun logVastAdDetails(vastAd: VastAd) {
+    private fun logVastAdDetails(vastAd: VastParser.VastAd) {
         Log.d(TAG, "========== VAST Ad Details ==========")
         Log.d(TAG, "Ad ID: ${vastAd.id}")
         Log.d(TAG, "Sequence: ${vastAd.sequence}")
@@ -236,9 +244,9 @@ class VastRepositoryImpl @Inject constructor(
 
     private fun shouldRetry(cause: Throwable): Boolean {
         return when (cause) {
-            is java.net.SocketTimeoutException,
-            is java.io.IOException,
-            is java.net.ConnectException -> true
+            is SocketTimeoutException,
+            is IOException,
+            is ConnectException -> true
             else -> false
         }
     }

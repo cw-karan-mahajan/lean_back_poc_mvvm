@@ -177,7 +177,7 @@ class MainViewModel @Inject constructor(
 
                 // Handle VAST video ads
                 if (item.rowItemX.tileType == "typeAdsVideoBanner" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                    //handleVastAd(item)
+                    handleVastAd(item)
                 } else {
                     // Existing video handling
                     isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
@@ -209,6 +209,7 @@ class MainViewModel @Inject constructor(
                         when (resource) {
                             is Resource.Success -> {
                                 val vastAd = resource.data
+                                //Log.d(TAG, "VAST Media Files: ${item.rowItemX.adsVideoUrl}")
                                 //logVastAdDetails(vastAd)
 
                                 // For now, just log the media files
@@ -234,8 +235,11 @@ class MainViewModel @Inject constructor(
 
     private fun logVastAdDetails(vastAd: VastParser.VastAd) {
         Log.d(TAG, "=== VAST Ad Details ===")
+        Log.d(TAG, "Ad TITLE: ${vastAd.adTitle}")
         Log.d(TAG, "Ad ID: ${vastAd.id}")
         Log.d(TAG, "Duration: ${vastAd.duration}")
+
+        Log.d(TAG, "mediaFiles: ${vastAd.mediaFiles.size}")
 
         Log.d(TAG, "--- Available MediaFiles ---")
         vastAd.mediaFiles.forEach { mediaFile ->

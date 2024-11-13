@@ -55,8 +55,6 @@ class AdRepositoryImpl @Inject constructor(
             Log.d(TAG, "Fetching ad for URL: $url")
 
             val response = adApiService.getAd(path, queryParams)
-            Log.d(TAG, "Path: $response")
-
             if (response.isSuccessful) {
                 try {
                     val responseBody = response.body()
@@ -112,8 +110,6 @@ class AdRepositoryImpl @Inject constructor(
                         } else {
                             adm
                         }}.replace("\\\"", "\"")
-
-                    Log.d(TAG, "Cleaned adm content: $cleanAdm")
 
                     val nativeAdWrapper = gson.fromJson(cleanAdm, NativeAdWrapper::class.java)
                     val imageUrl = nativeAdWrapper.native?.assets?.firstOrNull()?.img?.url
