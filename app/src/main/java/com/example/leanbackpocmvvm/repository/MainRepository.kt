@@ -24,7 +24,7 @@ class MainRepository @Inject constructor(
         val inputStream = context.assets.open("data2.json")
         val json: String = inputStream.bufferedReader().use { it.readText() }
         inputStream.close()
-        Log.d("MainRepository", "JSON read: ${json.take(600)}...") // Log first 600 chars
+        Log.d("MainRepository", "JSON read: ${json.take(800)}...") // Log first 600 chars
         return gson.fromJson(json, MyData2::class.java)
     }
 }

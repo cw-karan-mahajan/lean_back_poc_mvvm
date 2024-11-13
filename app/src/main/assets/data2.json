@@ -20,7 +20,7 @@
                     "title": "Shriram Finance Limited | Gold Loan | Ad Campaign_20Feb24_MB_prime",
                     "poster": "http://asset.s4.cloudwalker.tv/images/tiles/1165f1bd341dcd091388cda247d134f5/SFL_Gold_ads_07_27Mar2024_1920x500.webp",
                     "background": "http://asset.s4.cloudwalker.tv/images/tiles/1165f1bd341dcd091388cda247d134f5/ShriramFinanceLimited_1920x1080.webp",
-                    "ads_server": "https://tiles.springserve.com/nv/851883?w=1920&h=1080&sizes=%7B%7BSIZES%7D%7D&cb=%7B%7BCACHEBUSTER%7D%7D&ip=%7B%7BIP%7D%7D&ua=%7B%7BUSER_AGENT%7D%7D&app_bundle=%7B%7BAPP_BUNDLE%7D%7D&app_name=%7B%7BAPP_NAME%7D%7D&app_store_url=%7B%7BAPP_STORE_URL%7D%7D&did=%7B%7BDEVICE_ID%7D%7D&us_privacy=%7B%7BUS_PRIVACY%7D%7D",
+                    "ads_server": "https://tiles.springserve.com/nv/835421?w=1920&h=1080&sizes={{SIZES}}&cb={{CACHEBUSTER}}&ip={{IP}}&ua={{USER_AGENT}}&app_bundle={{APP_BUNDLE}}&app_name={{APP_NAME}}&app_store_url={{APP_STORE_URL}}&did={{DEVICE_ID}}&us_privacy={{US_PRIVACY}}",
                     "rating": 0,
                     "runtime": "",
                     "startTime": 0,

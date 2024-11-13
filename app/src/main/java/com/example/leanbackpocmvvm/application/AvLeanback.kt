@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.app.Application
 import android.content.ComponentCallbacks2
 import android.content.Context
-import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
 import com.bumptech.glide.Glide

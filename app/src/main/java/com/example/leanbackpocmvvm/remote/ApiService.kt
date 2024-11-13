@@ -2,8 +2,11 @@ package com.example.leanbackpocmvvm.remote
 
 import com.example.leanbackpocmvvm.models.AdResponse
 import com.example.leanbackpocmvvm.models.MyData2
+import com.google.gson.JsonObject
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.GET
+import retrofit2.http.Headers
 import retrofit2.http.QueryMap
 import retrofit2.http.Url
 
@@ -14,11 +17,12 @@ interface ApiService {
 }
 
 interface AdApiService {
+    @Headers("Accept-Encoding: identity", "Accept: application/json")
     @GET
     suspend fun getAd(
         @Url path: String,
         @QueryMap queryParams: Map<String, String>
-    ): Response<AdResponse?>
+    ): Response<ResponseBody?>
 
     @GET
     suspend fun trackImpression(

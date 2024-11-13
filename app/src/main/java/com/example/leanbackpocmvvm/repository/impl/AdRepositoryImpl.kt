@@ -55,12 +55,42 @@ class AdRepositoryImpl @Inject constructor(
             Log.d(TAG, "Fetching ad for URL: $url")
 
             val response = adApiService.getAd(path, queryParams)
-            val adResponse = response.getResponse()
+            Log.d(TAG, "Path: $response")
 
-            if (adResponse != null && response.isSuccessful) {
-                val parsedResponse = parseAdResponse(adResponse, url)
-                url to Resource.success(parsedResponse)
+            if (response.isSuccessful) {
+                try {
+                    val responseBody = response.body()
+                    if (responseBody != null) {
+                        val rawString = responseBody.string()
+                        try {
+                            // First try direct JSON parsing
+                            val adResponse = gson.fromJson(rawString, AdResponse::class.java)
+                            val parsedResponse = parseAdResponse(adResponse, url)
+                            url to Resource.success(parsedResponse)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error parsing response as JSON: ${e.message}")
+                            // If direct parsing fails, try decoding and then parsing
+                            try {
+                                val decodedString = String(rawString.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+                                Log.d(TAG, "Decoded response: $decodedString")
+                                val adResponse = gson.fromJson(decodedString, AdResponse::class.java)
+                                val parsedResponse = parseAdResponse(adResponse, url)
+                                url to Resource.success(parsedResponse)
+                            } catch (e2: Exception) {
+                                Log.e(TAG, "Error parsing decoded response: ${e2.message}")
+                                url to Resource.error("Error parsing response: ${e2.message}")
+                            }
+                        }
+                    } else {
+                        url to Resource.error("Empty response body")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error handling response: ${e.message}", e)
+                    url to Resource.error("Error handling response: ${e.message}")
+                }
             } else {
+                val errorBody = response.errorBody()?.string()
+                Log.e(TAG, "Error response: $errorBody")
                 url to Resource.error("Error fetching ad: ${response.code()}")
             }
         } catch (e: Exception) {
@@ -73,15 +103,32 @@ class AdRepositoryImpl @Inject constructor(
         val updatedSeatbid = adResponse.seatbid?.map { seatbid ->
             val updatedBids = seatbid.bid?.map { bid ->
                 try {
-                    val nativeAdWrapper = gson.fromJson(bid.adm, NativeAdWrapper::class.java)
+                    Log.d(TAG, "Original adm content: ${bid.adm}")
+
+                    // Remove any surrounding quotes and unescape the JSON string
+                    val cleanAdm = bid.adm.trim().let { adm ->
+                        if (adm.startsWith("\"") && adm.endsWith("\"")) {
+                            adm.substring(1, adm.length - 1)
+                        } else {
+                            adm
+                        }}.replace("\\\"", "\"")
+
+                    Log.d(TAG, "Cleaned adm content: $cleanAdm")
+
+                    val nativeAdWrapper = gson.fromJson(cleanAdm, NativeAdWrapper::class.java)
                     val imageUrl = nativeAdWrapper.native?.assets?.firstOrNull()?.img?.url
                     val impTrackerUrls = nativeAdWrapper.native?.imptrackers ?: emptyList()
+
+                    Log.d(TAG, "Parsed Image URL: $imageUrl")
+
                     if (impTrackerUrls.isNotEmpty()) {
                         impressionUrls[url] = impTrackerUrls
                     }
                     bid.copy(parsedImageUrl = imageUrl)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error parsing ad JSON: ${e.message}", e)
+                    Log.e(TAG, "Error parsing bid JSON: ${e.message}", e)
+                    Log.e(TAG, "Failed adm content: ${bid.adm}")
+                    e.printStackTrace()
                     bid
                 }
             }
@@ -109,7 +156,7 @@ class AdRepositoryImpl @Inject constructor(
             val queryParams = dynamicApiServiceFactory.extractQueryParams(impUrl)
 
             val response = adApiService.trackImpression(path, queryParams)
-            if (response.code() == 200 && response.isSuccessful) {
+            if (response.isSuccessful) {
                 Resource.success(Unit)
             } else {
                 Resource.error("Error tracking impression: ${response.code()}")

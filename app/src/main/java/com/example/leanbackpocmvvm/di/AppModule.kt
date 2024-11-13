@@ -33,7 +33,9 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideGson(): Gson = GsonBuilder().setLenient().create()
+    fun provideGson(): Gson {
+        return GsonBuilder().setLenient().disableHtmlEscaping().serializeNulls().create()
+    }
 
     @Provides
     @Singleton
@@ -78,6 +80,13 @@ object AppModule {
         return OkHttpClient.Builder()
             .hostnameVerifier { _, _ -> true }
             .addInterceptor(loggingInterceptor)
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val requestBuilder = original.newBuilder()
+                    .header("Accept-Encoding", "identity")
+                    .header("Accept", "application/json")
+                chain.proceed(requestBuilder.build())
+            }
     }
 
     @Provides

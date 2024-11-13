@@ -96,9 +96,11 @@ class MainViewModel @Inject constructor(
                     .filter { it.rowLayout == "landscape" && it.rowAdConfig != null && it.rowAdConfig.rowAdType == "typeAdsBanner" }
                     .flatMap { it.rowItems }
                     .mapNotNull { it.adsServer }
-
+                Log.d("Debug", "AdUrls prepared: ${adUrls.size}")
                 val adResponses = adRepository.fetchAds(adUrls)
+                Log.d("Debug", "Ad responses received")
                 updateDataWithAds(myData2, adResponses)
+                Log.d("Debug", "Data updated with ads")
                 _uiState.value = UiState.Success(myData2)
             } catch (e: Exception) {
                 _toastMessage.value = "Error loading data: ${e.message}"
@@ -175,7 +177,7 @@ class MainViewModel @Inject constructor(
 
                 // Handle VAST video ads
                 if (item.rowItemX.tileType == "typeAdsVideoBanner" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                    handleVastAd(item)
+                    //handleVastAd(item)
                 } else {
                     // Existing video handling
                     isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
@@ -202,7 +204,7 @@ class MainViewModel @Inject constructor(
                 Log.d(TAG, "Starting VAST ad processing for tileId: ${item.rowItemX.tid}")
                 Log.d(TAG, "VAST URL: ${item.rowItemX.adsVideoUrl}")
 
-                vastRepository.parseVastAd(item.rowItemX.adsVideoUrl!!, item.rowItemX.tid)
+                vastRepository.parseVastAd(item.rowItemX.adsVideoUrl ?: "", item.rowItemX.tid)
                     .collect { resource ->
                         when (resource) {
                             is Resource.Success -> {
@@ -311,7 +313,7 @@ class MainViewModel @Inject constructor(
                     _shrinkCardCommand.value = nextItem.rowItemX.tid
 
                     if (nextItem.rowItemX.tileType == "typeAdsVideoBanner" && !nextItem.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                        handleVastAd(nextItem)
+                        //handleVastAd(nextItem)
                     } else {
                         delayJob = launch {
                             delay(AUTO_SCROLL_DELAY)
