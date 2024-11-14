@@ -13,6 +13,7 @@ import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.repository.VastRepository
+import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,7 +32,8 @@ class MainViewModel @Inject constructor(
     private val apiRepository1: MainRepository1,
     private val adRepository: AdRepository,
     private val exoPlayerManager: ExoPlayerManager,
-    private val vastRepository: VastRepository
+    private val vastRepository: VastRepository,
+    private val vastAdSequenceManager: VastAdSequenceManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -65,6 +67,7 @@ class MainViewModel @Inject constructor(
     private var playbackJob: Job? = null
     private var delayJob: Job? = null
     private var userInteractionJob: Job? = null
+    private var adPreparationJob: Job? = null
     private var currentAutoScrollRowIndex = -1
     private var currentAutoScrollItemIndex = -1
     private var currentPlayingRowIndex: Int = -1
@@ -74,10 +77,13 @@ class MainViewModel @Inject constructor(
     private var pendingVideoPlay: CustomRowItemX? = null
     private var currentlyPlayingVideoTileId: String? = null
     private var lastInteractionTime = 0L
+    private var isPlayingAdSequence = false
 
     private val AUTO_SCROLL_DELAY = 5000L
     private val VIDEO_START_DELAY = 5000L
     private val USER_IDLE_DELAY = 5000L
+    private val AD_PREVIEW_DELAY = 10000L  // 10 seconds for ad preview
+
     var mRowsAdapter: ArrayObjectAdapter? = null
     private val _fullyVisibleTileIds = Collections.synchronizedSet(mutableSetOf<String>())
     private val _playedVideoTileIds = mutableSetOf<String>()
@@ -87,6 +93,10 @@ class MainViewModel @Inject constructor(
     private val _trackedImpressionTileIds = Collections.synchronizedSet(mutableSetOf<String>())
     private var impressionTrackingJob: Job? = null
     private var currentlyPlayingAdTileId: String? = null
+
+    init {
+        adPreparationJob = SupervisorJob()
+    }
 
     fun loadData() {
         viewModelScope.launch {
@@ -143,25 +153,14 @@ class MainViewModel @Inject constructor(
                         updateDataWithAds(myData2, adResponses)
                         _uiState.value = UiState.Success(myData2)
                     }
-
                     is Resource.Error -> {
                         _uiState.value = UiState.Error(response.message)
                         _toastMessage.postValue("Error loading data: ${response.message}")
                     }
-
                     is Resource.Loading -> {}
                 }
             }
         }
-    }
-
-    fun setNetworkStatus(isConnected: Boolean) {
-        if (isConnected) {
-            _toastMessage.value = "Network connected"
-        } else {
-            _toastMessage.value = "Network disconnected"
-        }
-        _networkStatus.value = isConnected
     }
 
     fun onItemFocused(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
@@ -175,11 +174,9 @@ class MainViewModel @Inject constructor(
                 cancelPendingPlayback()
                 pauseAutoScroll()
 
-                // Handle VAST video ads
                 if (item.rowItemX.tileType == "typeAdsVideoBanner" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
                     handleVastAd(item)
                 } else {
-                    // Existing video handling
                     isCurrentRowAutoScrollable = isAutoScrollableRow(rowIndex)
                     if (isCurrentRowAutoScrollable) {
                         if (item.rowItemX.videoUrl != null) {
@@ -199,73 +196,185 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleVastAd(item: CustomRowItemX) {
-        viewModelScope.launch {
+        adPreparationJob?.cancel()
+        adPreparationJob = viewModelScope.launch {
             try {
                 Log.d(TAG, "Starting VAST ad processing for tileId: ${item.rowItemX.tid}")
                 Log.d(TAG, "VAST URL: ${item.rowItemX.adsVideoUrl}")
 
-                vastRepository.parseVastAd(item.rowItemX.adsVideoUrl ?: "", item.rowItemX.tid)
-                    .collect { resource ->
-                        when (resource) {
-                            is Resource.Success -> {
-                                val vastAd = resource.data
-                                //Log.d(TAG, "VAST Media Files: ${item.rowItemX.adsVideoUrl}")
-                                //logVastAdDetails(vastAd)
+                // Prepare ad sequence during 10-second preview
+                val success = vastAdSequenceManager.prepareAdSequence(
+                    item.rowItemX.adsVideoUrl ?: "",
+                    item.rowItemX.tid
+                )
 
-                                // For now, just log the media files
-                                // Later we'll handle media selection based on network speed
-                            }
-
-                            is Resource.Error -> {
-                                Log.e(TAG, "Error loading VAST ad: ${resource.message}")
-                                _toastMessage.value = "Error loading video ad"
-                            }
-
-                            is Resource.Loading -> {
-                                Log.d(TAG, "Loading VAST ad...")
-                            }
-                        }
-                    }
+                if (success) {
+                    scheduleAdSequencePlay(item)
+                } else {
+                    Log.e(TAG, "Failed to prepare VAST ad sequence")
+                    _toastMessage.postValue("Error loading video ad")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling VAST ad: ${e.message}")
-                _toastMessage.value = "Error processing video ad"
+                _toastMessage.postValue("Error processing video ad")
             }
         }
     }
 
-    private fun logVastAdDetails(vastAd: VastParser.VastAd) {
-        Log.d(TAG, "=== VAST Ad Details ===")
-        Log.d(TAG, "Ad TITLE: ${vastAd.adTitle}")
-        Log.d(TAG, "Ad ID: ${vastAd.id}")
-        Log.d(TAG, "Duration: ${vastAd.duration}")
+    private fun scheduleAdSequencePlay(item: CustomRowItemX) {
+        cancelPendingPlayback()
+        val scheduledRowIndex = currentPlayingRowIndex
+        val scheduledItemIndex = currentPlayingItemIndex
 
-        Log.d(TAG, "mediaFiles: ${vastAd.mediaFiles.size}")
-
-        Log.d(TAG, "--- Available MediaFiles ---")
-        vastAd.mediaFiles.forEach { mediaFile ->
-            Log.d(
-                TAG, """
-                MediaFile:
-                URL: ${mediaFile.url}
-                Bitrate: ${mediaFile.bitrate}
-                Resolution: ${mediaFile.width}x${mediaFile.height}
-                Type: ${mediaFile.type}
-                Delivery: ${mediaFile.delivery}
-            """.trimIndent()
-            )
+        playbackJob = viewModelScope.launch {
+            delay(AD_PREVIEW_DELAY) // 10 seconds preview
+            if (currentPlayingRowIndex == scheduledRowIndex &&
+                currentPlayingItemIndex == scheduledItemIndex &&
+                !isVideoPlaying) {
+                playAdSequence(item)
+            }
         }
-
-        // Log highest quality file
-        vastAd.mediaFiles.maxByOrNull { it.bitrate }?.let { highestQuality ->
-            Log.d(TAG, "Highest quality MediaFile:")
-            Log.d(TAG, "- Bitrate: ${highestQuality.bitrate}")
-            Log.d(TAG, "- Resolution: ${highestQuality.width}x${highestQuality.height}")
-            Log.d(TAG, "- URL: ${highestQuality.url}")
-        }
-
-        Log.d(TAG, "========================")
     }
 
+    private fun playAdSequence(item: CustomRowItemX) {
+        isPlayingAdSequence = true
+        playCurrentAd(item)
+    }
+
+    private fun playCurrentAd(item: CustomRowItemX) {
+        vastAdSequenceManager.getCurrentVideoUrl()?.let { videoUrl ->
+            vastAdSequenceManager.startTracking()
+            addPlayedVideoTileId(item.rowItemX.tid)
+            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+            currentlyPlayingVideoTileId = item.rowItemX.tid
+            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid)
+        }
+    }
+
+    private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
+        cancelPendingPlayback()
+        pendingVideoPlay = item
+        playbackJob = viewModelScope.launch {
+            delay(VIDEO_START_DELAY)
+            if (currentPlayingRowIndex == rowIndex && currentPlayingItemIndex == itemIndex) {
+                playVideo(item, rowIndex, itemIndex)
+            }
+        }
+    }
+
+    private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
+        item.rowItemX.videoUrl?.let { videoUrl ->
+            addPlayedVideoTileId(item.rowItemX.tid)
+            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+            currentlyPlayingVideoTileId = item.rowItemX.tid
+            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid)
+        }
+    }
+
+    fun onVideoEnded(tileId: String) {
+        if (isPlayingAdSequence) {
+            handleAdSequenceVideoEnd(tileId)
+        } else {
+            handleRegularVideoEnd(tileId)
+        }
+        currentlyPlayingAdTileId = null
+    }
+
+    private fun handleAdSequenceVideoEnd(tileId: String) {
+        vastAdSequenceManager.completeCurrentAd()
+        if (vastAdSequenceManager.hasNextAd()) {
+            vastAdSequenceManager.moveToNextAd()
+            currentlyPlayingVideoTileId?.let { tid ->
+                val item = findItemByTid(tid)
+                item?.let { playCurrentAd(it) }
+            }
+        } else {
+            handleAdSequenceComplete(tileId)
+        }
+    }
+
+    private fun handleRegularVideoEnd(tileId: String) {
+        handleVideoEnded(tileId)
+    }
+
+    private fun handleAdSequenceComplete(tileId: String) {
+        isPlayingAdSequence = false
+        vastAdSequenceManager.reset()
+        viewModelScope.launch(Dispatchers.Main) {
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            _shrinkCardCommand.value = tileId
+
+            // Show thumbnail for 5 seconds before moving to next
+            delay(5000)
+            if (isCurrentRowAutoScrollable) {
+                scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
+            }
+        }
+    }
+
+    fun stopVideoPlayback() {
+        viewModelScope.launch(Dispatchers.Main) {
+            exoPlayerManager.releasePlayer()
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            currentlyPlayingVideoTileId?.let { tileId ->
+                _resetCardCommand.value = tileId
+            }
+            isVideoPlaying = false
+            currentlyPlayingVideoTileId = null
+            cancelPendingPlayback()
+        }
+    }
+
+    private fun findItemByTid(tid: String): CustomRowItemX? {
+        mRowsAdapter?.let { adapter ->
+            for (i in 0 until adapter.size()) {
+                val row = adapter.get(i) as? ListRow
+                val rowAdapter = row?.adapter as? ArrayObjectAdapter
+                rowAdapter?.let {
+                    for (j in 0 until it.size()) {
+                        val item = it.get(j) as? CustomRowItemX
+                        if (item?.rowItemX?.tid == tid) {
+                            return item
+                        }
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    private fun handleVideoEnded(tileId: String) {
+        viewModelScope.launch(Dispatchers.Main) {
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            _shrinkCardCommand.value = tileId
+            isVideoPlaying = false
+            currentlyPlayingVideoTileId = null
+
+            if (isCurrentRowAutoScrollable) {
+                delay(AUTO_SCROLL_DELAY)
+                scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
+            }
+        }
+    }
+
+    private fun stopAndShrinkPreviousItem() {
+        currentlyPlayingVideoTileId?.let { tileId ->
+            exoPlayerManager.releasePlayer()
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            _resetCardCommand.value = tileId
+            isVideoPlaying = false
+            currentlyPlayingVideoTileId = null
+        }
+    }
+
+    private fun cancelPendingPlayback() {
+        playbackJob?.cancel()
+        playbackJob = null
+        pendingVideoPlay = null
+        adPreparationJob?.cancel()
+    }
+
+    // Auto-scroll related functions
     private fun isAutoScrollableRow(rowIndex: Int): Boolean {
         val row = mRowsAdapter?.get(rowIndex) as? ListRow
         val firstItem = row?.adapter?.get(0) as? CustomRowItemX
@@ -317,7 +426,7 @@ class MainViewModel @Inject constructor(
                     _shrinkCardCommand.value = nextItem.rowItemX.tid
 
                     if (nextItem.rowItemX.tileType == "typeAdsVideoBanner" && !nextItem.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                        //handleVastAd(nextItem)
+                        handleVastAd(nextItem)
                     } else {
                         delayJob = launch {
                             delay(AUTO_SCROLL_DELAY)
@@ -336,54 +445,28 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
-        cancelPendingPlayback()
-        pendingVideoPlay = item
-        playbackJob = viewModelScope.launch {
-            delay(VIDEO_START_DELAY)
-            if (currentPlayingRowIndex == rowIndex && currentPlayingItemIndex == itemIndex) {
-                playVideo(item, rowIndex, itemIndex)
-            }
+    fun stopAutoScroll() {
+        autoScrollJob?.cancel()
+        delayJob?.cancel()
+        userInteractionJob?.cancel()
+        autoScrollJob = null
+        delayJob = null
+        userInteractionJob = null
+        currentAutoScrollRowIndex = -1
+        currentAutoScrollItemIndex = -1
+    }
+
+    // Network and impression tracking
+    fun setNetworkStatus(isConnected: Boolean) {
+        if (isConnected) {
+            _toastMessage.value = "Network connected"
+        } else {
+            _toastMessage.value = "Network disconnected"
         }
-    }
-
-    private fun playVideo(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
-        item.rowItemX.videoUrl?.let { videoUrl ->
-            addPlayedVideoTileId(item.rowItemX.tid)
-            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
-            currentlyPlayingVideoTileId = item.rowItemX.tid
-            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid)
-        }
-    }
-
-    fun stopVideoPlayback() {
-        viewModelScope.launch(Dispatchers.Main) {
-            exoPlayerManager.releasePlayer()
-            _videoPlaybackState.value = VideoPlaybackState.Stopped
-            currentlyPlayingVideoTileId?.let { tileId ->
-                _resetCardCommand.value = tileId
-            }
-            isVideoPlaying = false
-            currentlyPlayingVideoTileId = null
-            cancelPendingPlayback()
-        }
-    }
-
-    fun onItemClicked(item: CustomRowItemX) {
-        // Handle item click
-    }
-
-    fun onSearchClicked() {
-        // Handle search click
-    }
-
-    fun onVideoEnded(tileId: String) {
-        handleVideoEnded(tileId)
-        currentlyPlayingAdTileId = null
+        _networkStatus.value = isConnected
     }
 
     fun onUserFocus(item: CustomRowItemX) {
-        // Check if this tile's impression hasn't been tracked yet
         if (_trackedImpressionTileIds.add(item.rowItemX.tid)) {
             item.rowItemX.adsServer?.let { adsServerUrl ->
                 Log.d(TAG, "Tracking impression for focused tile: ${item.rowItemX.tid}")
@@ -403,7 +486,6 @@ class MainViewModel @Inject constructor(
         if (_fullyVisibleTileIds.add(tileId) && _trackedImpressionTileIds.add(tileId)) {
             customItem?.rowItemX?.adsServer?.let { adsServerUrl ->
                 Log.d(TAG, "Added new fully visible tile ID: $tileId")
-                // Get the impression tracker URLs for this ads_server URL
                 val impTrackerUrls = adRepository.getImpressionTrackerUrls(adsServerUrl)
                 impTrackerUrls.forEach { impTrackerUrl ->
                     _pendingImpressions.add(tileId to impTrackerUrl)
@@ -416,77 +498,6 @@ class MainViewModel @Inject constructor(
     private fun addPlayedVideoTileId(tileId: String) {
         if (_playedVideoTileIds.add(tileId)) {
             Log.d(TAG, "Added new played video tile ID: $tileId")
-        }
-    }
-
-    private fun handleVideoEnded(tileId: String) {
-        viewModelScope.launch(Dispatchers.Main) {
-            _videoPlaybackState.value = VideoPlaybackState.Stopped
-            _shrinkCardCommand.value = tileId
-            isVideoPlaying = false
-            currentlyPlayingVideoTileId = null
-
-            if (isCurrentRowAutoScrollable) {
-                delay(AUTO_SCROLL_DELAY)
-                scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
-            }
-        }
-    }
-
-    private fun stopAndShrinkPreviousItem() {
-        currentlyPlayingVideoTileId?.let { tileId ->
-            exoPlayerManager.releasePlayer()
-            _videoPlaybackState.value = VideoPlaybackState.Stopped
-            _resetCardCommand.value = tileId
-            isVideoPlaying = false
-            currentlyPlayingVideoTileId = null
-        }
-    }
-
-    private fun cancelPendingPlayback() {
-        playbackJob?.cancel()
-        playbackJob = null
-        pendingVideoPlay = null
-    }
-
-    fun stopAutoScroll() {
-        autoScrollJob?.cancel()
-        delayJob?.cancel()
-        userInteractionJob?.cancel()
-        autoScrollJob = null
-        delayJob = null
-        userInteractionJob = null
-        currentAutoScrollRowIndex = -1
-        currentAutoScrollItemIndex = -1
-    }
-
-    fun preloadVideo(item: CustomRowItemX) {
-        if (item.rowItemX.tileType == "typeAdsVideoBanner" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-            viewModelScope.launch {
-                vastRepository.preloadVastAd(item.rowItemX.adsVideoUrl ?: "", item.rowItemX.tid)
-                    .collect { resource ->
-                        when (resource) {
-                            is Resource.Success -> {
-                                Log.d(
-                                    TAG,
-                                    "Successfully preloaded VAST ad for tileId: ${item.rowItemX.tid}"
-                                )
-                            }
-
-                            is Resource.Error -> {
-                                Log.e(TAG, "Error preloading VAST ad: ${resource.message}")
-                            }
-
-                            is Resource.Loading -> {
-                                Log.d(TAG, "Preloading VAST ad...")
-                            }
-                        }
-                    }
-            }
-        } else {
-            item.rowItemX.videoUrl?.let { videoUrl ->
-                _preloadVideoCommand.value = PreloadVideoCommand(videoUrl)
-            }
         }
     }
 
@@ -511,23 +522,45 @@ class MainViewModel @Inject constructor(
                         is Resource.Success -> {
                             Log.d(TAG, "Impression tracked successfully for tile: $tileId")
                         }
-
                         is Resource.Error -> {
                             Log.e(
                                 TAG,
                                 "Failed to track impression for tile: $tileId. Error: ${result.message}"
                             )
-                            // If tracking failed, we might want to re-add to pending impressions
                             _pendingImpressions.add(tileId to impressions.first { it.first == tileId }.second)
                         }
-
                         else -> {}
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error tracking impressions: ${e.message}", e)
-                // Re-add all impressions back to the pending list
                 _pendingImpressions.addAll(impressions)
+            }
+        }
+    }
+
+    // Video preloading
+    fun preloadVideo(item: CustomRowItemX) {
+        if (item.rowItemX.tileType == "typeAdsVideoBanner" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
+            viewModelScope.launch {
+                vastRepository.preloadVastAd(item.rowItemX.adsVideoUrl ?: "", item.rowItemX.tid)
+                    .collect { resource ->
+                        when (resource) {
+                            is Resource.Success -> {
+                                Log.d(TAG, "Successfully preloaded VAST ad for tileId: ${item.rowItemX.tid}")
+                            }
+                            is Resource.Error -> {
+                                Log.e(TAG, "Error preloading VAST ad: ${resource.message}")
+                            }
+                            is Resource.Loading -> {
+                                Log.d(TAG, "Preloading VAST ad...")
+                            }
+                        }
+                    }
+            }
+        } else {
+            item.rowItemX.videoUrl?.let { videoUrl ->
+                _preloadVideoCommand.value = PreloadVideoCommand(videoUrl)
             }
         }
     }
@@ -538,6 +571,7 @@ class MainViewModel @Inject constructor(
         cancelPendingPlayback()
         exoPlayerManager.releasePlayer()
         stopAutoScroll()
+        vastAdSequenceManager.reset()
     }
 
     companion object {

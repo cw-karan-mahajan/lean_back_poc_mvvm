@@ -36,6 +36,12 @@ class VastMediaSelector @Inject constructor(
         val reason: String
     )
 
+    fun selectLowestBitrateMediaFile(vastAd: VastParser.VastAd): VastParser.MediaFile? {
+        return vastAd.mediaFiles
+            .filter { it.type == "video/mp4" }
+            .maxByOrNull { it.bitrate }
+    }
+
     fun selectBestMediaFile(vastAd: VastParser.VastAd): VastParser.MediaFile? {
         try {
             val selections = vastAd.mediaFiles.mapNotNull { mediaFile ->

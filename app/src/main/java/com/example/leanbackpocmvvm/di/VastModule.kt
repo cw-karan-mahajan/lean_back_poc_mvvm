@@ -12,6 +12,7 @@ import com.example.leanbackpocmvvm.utils.getSupportedCodecs
 import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
 import com.example.leanbackpocmvvm.vastdata.cache.SimpleVastCache
 import com.example.leanbackpocmvvm.vastdata.handler.VastErrorHandler
+import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.vastdata.validator.VastMediaSelector
 import com.example.leanbackpocmvvm.vastdata.validator.VastXmlValidator
@@ -142,6 +143,20 @@ object VastModule {
             ),
             maxBitrate = getBandwidthBasedMaxBitrate(context),
             supportedCodecs = getSupportedCodecs()
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideVastAdSequenceManager(
+        vastParser: VastParser,
+        vastMediaSelector: VastMediaSelector,
+        vastTrackingManager: VastTrackingManager
+    ): VastAdSequenceManager {
+        return VastAdSequenceManager(
+            vastParser = vastParser,
+            vastMediaSelector = vastMediaSelector,
+            vastTrackingManager = vastTrackingManager
         )
     }
 }

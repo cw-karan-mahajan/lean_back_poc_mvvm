@@ -59,9 +59,14 @@ class ExoPlayerManager @Inject constructor(
         return exoPlayer!!
     }
 
-    fun prepareVideo(videoUrl: String, playerView: PlayerView, onReady: (Boolean) -> Unit, onEnded: () -> Unit) {
+    fun prepareVideo(
+        videoUrl: String,
+        playerView: PlayerView,
+        onReady: (Boolean) -> Unit,
+        onEnded: () -> Unit,
+        isPartOfSequence: Boolean = false
+    ) {
         playerScope.launch {
-
             if (exoPlayer == null || exoPlayer?.playbackState == Player.STATE_IDLE) {
                 reinitializePlayer()
             }
@@ -72,7 +77,10 @@ class ExoPlayerManager @Inject constructor(
                 }
 
                 if (isPlayingVideo.get()) {
-                    releasePlayer()
+                    // If not part of sequence, release player
+                    if (!isPartOfSequence) {
+                        releasePlayer()
+                    }
                 }
 
                 val player = getOrCreatePlayer()
@@ -97,6 +105,10 @@ class ExoPlayerManager @Inject constructor(
                                 hasVideoEnded.set(false)
                             }
                             Player.STATE_ENDED -> {
+                                // Only release player if not part of sequence
+                                if (!isPartOfSequence) {
+                                    releasePlayer()
+                                }
                                 onEnded()
                                 hasVideoEnded.set(true)
                                 isPlayingVideo.set(false)
@@ -166,7 +178,7 @@ class ExoPlayerManager @Inject constructor(
             .setLoadControl(createLoadControl())
             .build()
             .apply {
-                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+                videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT
                 repeatMode = Player.REPEAT_MODE_OFF
             }
     }
@@ -245,7 +257,6 @@ class ExoPlayerManager @Inject constructor(
     }
 
     fun isPlayerReleased(): Boolean = exoPlayer == null
-
 
     fun onLifecycleDestroy() {
         releasePlayer()

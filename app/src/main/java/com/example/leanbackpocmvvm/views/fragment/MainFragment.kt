@@ -171,8 +171,9 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         cardView.prepareForVideoPlayback()
         cardView.videoPlaceholder.addView(sharedPlayerView)
-
-        exoPlayerManager.prepareVideo(videoUrl, sharedPlayerView,
+        val isPartOfSequence = cardView.customItem?.rowItemX?.tileType == "typeAdsVideoBanner" &&
+                !cardView.customItem?.rowItemX?.adsVideoUrl.isNullOrEmpty()
+        exoPlayerManager.prepareVideo(videoUrl = videoUrl, playerView =  sharedPlayerView,
             onReady = { isReady ->
                 if (isReady) {
                     cardView.startVideoPlayback()
@@ -180,7 +181,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             },
             onEnded = {
                 viewModel.onVideoEnded(tileId)
-            }
+            }, isPartOfSequence = isPartOfSequence
         )
     }
 
@@ -207,12 +208,12 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         setOnItemViewClickedListener { _, item, _, _ ->
             if (item is CustomRowItemX) {
-                viewModel.onItemClicked(item)
+                //viewModel.onItemClicked(item)
             }
         }
 
         setOnSearchClickedListener {
-            viewModel.onSearchClicked()
+            //viewModel.onSearchClicked()
         }
     }
 
