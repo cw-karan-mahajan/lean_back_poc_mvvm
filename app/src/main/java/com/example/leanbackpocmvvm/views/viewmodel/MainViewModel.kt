@@ -303,7 +303,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.Main) {
             _videoPlaybackState.value = VideoPlaybackState.Stopped
             _shrinkCardCommand.value = tileId
-
+            isCurrentRowAutoScrollable = isAutoScrollableRow(currentPlayingRowIndex)
             // Show thumbnail for 5 seconds before moving to next
             delay(5000)
             if (isCurrentRowAutoScrollable) {
@@ -349,7 +349,7 @@ class MainViewModel @Inject constructor(
             _shrinkCardCommand.value = tileId
             isVideoPlaying = false
             currentlyPlayingVideoTileId = null
-
+            isCurrentRowAutoScrollable = isAutoScrollableRow(currentPlayingRowIndex)
             if (isCurrentRowAutoScrollable) {
                 delay(AUTO_SCROLL_DELAY)
                 scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
@@ -426,7 +426,7 @@ class MainViewModel @Inject constructor(
                     _shrinkCardCommand.value = nextItem.rowItemX.tid
 
                     if (nextItem.rowItemX.tileType == "typeAdsVideoBanner" && !nextItem.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-                        handleVastAd(nextItem)
+                        //handleVastAd(nextItem)
                     } else {
                         delayJob = launch {
                             delay(AUTO_SCROLL_DELAY)
