@@ -148,7 +148,7 @@ class ExoPlayerManager @Inject constructor(
         }
     }
 
-    fun preloadVideo(videoUrl: String) {
+    /*fun preloadVideo(videoUrl: String) {
         playerScope.launch(Dispatchers.IO) {
             try {
                 val dataSourceFactory = DefaultDataSource.Factory(context)
@@ -167,7 +167,7 @@ class ExoPlayerManager @Inject constructor(
                 Log.e(TAG, "Error preloading video: ${e.message}")
             }
         }
-    }
+    }*/
 
     private fun createExoPlayer(): ExoPlayer {
         val renderersFactory = DefaultRenderersFactory(context).apply {

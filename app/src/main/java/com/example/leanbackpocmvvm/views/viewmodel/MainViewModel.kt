@@ -58,7 +58,6 @@ class MainViewModel @Inject constructor(
     val resetCardCommand: LiveData<String> = _resetCardCommand
 
     private val _videoPlaybackState = MutableLiveData<VideoPlaybackState>()
-    val videoPlaybackState: LiveData<VideoPlaybackState> = _videoPlaybackState
 
     private val _preloadVideoCommand = MutableLiveData<PreloadVideoCommand>()
     val preloadVideoCommand: LiveData<PreloadVideoCommand> = _preloadVideoCommand

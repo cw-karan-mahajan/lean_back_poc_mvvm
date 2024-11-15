@@ -59,7 +59,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     private lateinit var sharedPlayerView: PlayerView
     private var currentPlayingCard: NewVideoCardView? = null
-    private var previousVisibleCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
