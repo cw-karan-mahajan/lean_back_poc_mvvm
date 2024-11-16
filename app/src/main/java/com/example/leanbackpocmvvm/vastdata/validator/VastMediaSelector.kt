@@ -39,7 +39,7 @@ class VastMediaSelector @Inject constructor(
     fun selectLowestBitrateMediaFile(vastAd: VastParser.VastAd): VastParser.MediaFile? {
         return vastAd.mediaFiles
             .filter { it.type == "video/mp4" }
-            .maxByOrNull { it.bitrate }
+            .minByOrNull { it.bitrate }
     }
 
     fun selectBestMediaFile(vastAd: VastParser.VastAd): VastParser.MediaFile? {

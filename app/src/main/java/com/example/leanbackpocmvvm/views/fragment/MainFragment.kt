@@ -40,6 +40,7 @@ import com.example.leanbackpocmvvm.views.viewmodel.AutoScrollCommand
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
 import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import com.example.leanbackpocmvvm.views.viewmodel.UiState
+import com.example.leanbackpocmvvm.views.viewmodel.VideoPlaybackState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.launch
@@ -111,7 +112,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                             viewModel.mRowsAdapter = rowsAdapter
                             setupEventListeners()
                         }
-
                         is UiState.Error -> {
                             hideProgressBar()
                             Toast.makeText(context, "Error: ${state.message}", Toast.LENGTH_LONG)
@@ -141,7 +141,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
         viewModel.resetCardCommand.observe(viewLifecycleOwner) { tileId ->
             val cardToReset = view?.findViewWithTag<NewVideoCardView>(tileId)
-            cardToReset?.isVideoPlaying = false
             cardToReset?.resetCardState()
         }
 
@@ -156,23 +155,60 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         viewModel.preloadVideoCommand.observe(viewLifecycleOwner) { command ->
             //exoPlayerManager.preloadVideo(command.videoUrl)
         }
+
+        viewModel.videoPlaybackState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is VideoPlaybackState.Playing -> {
+                    val cardView = view?.findViewWithTag<NewVideoCardView>(state.itemId)
+                    cardView?.let { card ->
+                        val isAdSequence = card.customItem?.rowItemX?.let {
+                            it.tileType == "typeAdsVideoBanner" && !it.adsVideoUrl.isNullOrEmpty()
+                        } ?: false
+                        card.prepareForVideoPlayback(isAdSequence)
+                        card.startVideoPlayback()
+                    }
+                }
+                is VideoPlaybackState.SequenceContinuing -> {
+                    // Just prepare for next ad without resetting state
+                    currentPlayingCard?.let { card ->
+                        val isAdSequence = card.customItem?.rowItemX?.let {
+                            it.tileType == "typeAdsVideoBanner" && !it.adsVideoUrl.isNullOrEmpty()
+                        } ?: false
+                        card.prepareForVideoPlayback(isAdSequence)
+                    }
+                }
+                is VideoPlaybackState.Stopped -> {
+                    currentPlayingCard?.let { card ->
+                        val shouldResetState = !viewModel.isPlayingAdSequence() ||
+                                (viewModel.isLastAd() && !viewModel.hasNextAd())
+                        if (shouldResetState) {
+                            card.resetCardState()
+                        } else {
+                            // Keep expanded for next ad in sequence
+                            card.prepareForVideoPlayback(true)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun prepareVideoPlayback(cardView: NewVideoCardView, videoUrl: String, tileId: String) {
-        // Stop any currently playing video
         stopVideoPlayback()
-
-        // Set the new current playing card
         currentPlayingCard = cardView
 
-        // Remove PlayerView from its current parent
         (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
 
-        cardView.prepareForVideoPlayback()
+        val isPartOfSequence = cardView.customItem?.rowItemX?.let {
+            it.tileType == "typeAdsVideoBanner" && !it.adsVideoUrl.isNullOrEmpty()
+        } ?: false
+
+        cardView.prepareForVideoPlayback(isPartOfSequence)
         cardView.videoPlaceholder.addView(sharedPlayerView)
-        val isPartOfSequence = cardView.customItem?.rowItemX?.tileType == "typeAdsVideoBanner" &&
-                !cardView.customItem?.rowItemX?.adsVideoUrl.isNullOrEmpty()
-        exoPlayerManager.prepareVideo(videoUrl = videoUrl, playerView =  sharedPlayerView,
+
+        exoPlayerManager.prepareVideo(
+            videoUrl = videoUrl,
+            playerView = sharedPlayerView,
             onReady = { isReady ->
                 if (isReady) {
                     cardView.startVideoPlayback()
@@ -180,7 +216,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             },
             onEnded = {
                 viewModel.onVideoEnded(tileId)
-            }, isPartOfSequence = isPartOfSequence
+            },
+            isPartOfSequence = isPartOfSequence
         )
     }
 
@@ -540,7 +577,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     private fun stopVideoPlayback() {
         exoPlayerManager.releasePlayer()
         (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
-        currentPlayingCard?.endVideoPlayback()
+
+        currentPlayingCard?.let { card ->
+            val shouldResetState = !viewModel.isPlayingAdSequence() ||
+                    (viewModel.isLastAd() && !viewModel.hasNextAd())
+            card.endVideoPlayback(shouldResetState)
+        }
+
         currentPlayingCard = null
     }
 

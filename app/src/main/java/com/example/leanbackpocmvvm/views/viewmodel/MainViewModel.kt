@@ -14,7 +14,6 @@ import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.repository.VastRepository
 import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
-import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
@@ -58,6 +57,7 @@ class MainViewModel @Inject constructor(
     val resetCardCommand: LiveData<String> = _resetCardCommand
 
     private val _videoPlaybackState = MutableLiveData<VideoPlaybackState>()
+    val videoPlaybackState: LiveData<VideoPlaybackState> = _videoPlaybackState
 
     private val _preloadVideoCommand = MutableLiveData<PreloadVideoCommand>()
     val preloadVideoCommand: LiveData<PreloadVideoCommand> = _preloadVideoCommand
@@ -281,13 +281,20 @@ class MainViewModel @Inject constructor(
 
     private fun handleAdSequenceVideoEnd(tileId: String) {
         vastAdSequenceManager.completeCurrentAd()
+
         if (vastAdSequenceManager.hasNextAd()) {
+            Log.d(TAG, "Moving to next ad in sequence")
             vastAdSequenceManager.moveToNextAd()
             currentlyPlayingVideoTileId?.let { tid ->
                 val item = findItemByTid(tid)
-                item?.let { playCurrentAd(it) }
+                item?.let {
+                    // Continue sequence immediately with next ad
+                    _videoPlaybackState.value = VideoPlaybackState.SequenceContinuing
+                    playCurrentAd(it)
+                }
             }
         } else {
+            Log.d(TAG, "Ad sequence complete")
             handleAdSequenceComplete(tileId)
         }
     }
@@ -301,9 +308,8 @@ class MainViewModel @Inject constructor(
         vastAdSequenceManager.reset()
         viewModelScope.launch(Dispatchers.Main) {
             _videoPlaybackState.value = VideoPlaybackState.Stopped
-            _shrinkCardCommand.value = tileId
+            _resetCardCommand.value = tileId
             isCurrentRowAutoScrollable = isAutoScrollableRow(currentPlayingRowIndex)
-            // Show thumbnail for 5 seconds before moving to next
             delay(5000)
             if (isCurrentRowAutoScrollable) {
                 scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
@@ -573,6 +579,12 @@ class MainViewModel @Inject constructor(
         vastAdSequenceManager.reset()
     }
 
+    fun isPlayingAdSequence(): Boolean = isPlayingAdSequence
+
+    fun hasNextAd(): Boolean = vastAdSequenceManager.hasNextAd()
+
+    fun isLastAd(): Boolean = vastAdSequenceManager.isLastAd()
+
     companion object {
         private const val TAG = "MainViewModel"
     }
@@ -591,6 +603,7 @@ data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowAdT
 
 sealed class VideoPlaybackState {
     data class Playing(val itemId: String, val videoUrl: String) : VideoPlaybackState()
+    object SequenceContinuing : VideoPlaybackState()
     object Stopped : VideoPlaybackState()
 }
 

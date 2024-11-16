@@ -2,7 +2,6 @@ package com.example.leanbackpocmvvm.views.customview
 
 import android.content.Context
 import android.util.Log
-import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -15,9 +14,7 @@ import com.example.leanbackpocmvvm.R
 import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.utils.dpToPx
 import com.example.leanbackpocmvvm.views.activity.MainActivity
-import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
-import com.example.leanbackpocmvvm.views.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 @UnstableApi
@@ -26,7 +23,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private val posterImageView: ImageView
     val videoPlaceholder: FrameLayout
     private val innerLayout: FrameLayout
-    private var videoSurface: Surface? = null
     var isVideoPlaying = false
     private var thumbnailOverlay: FrameLayout
 
@@ -37,6 +33,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private lateinit var lifecycleOwner: LifecycleOwner
     private var isViewAttached = false
     var customItem: CustomRowItemX? = null
+    private var isInAdSequence = false
 
     init {
         layoutParams = ViewGroup.LayoutParams(
@@ -187,8 +184,9 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         resizeCard(false) // Initially set to non-stretched size
     }
 
-    fun prepareForVideoPlayback() {
-        Log.d(TAG, "Preparing for video playback")
+    fun prepareForVideoPlayback(isPartOfSequence: Boolean = false) {
+        Log.d(TAG, "Preparing for video playback, isPartOfSequence: $isPartOfSequence")
+        isInAdSequence = isPartOfSequence
         videoPlaceholder.visibility = View.VISIBLE
         thumbnailImageView.visibility = View.GONE
         posterImageView.visibility = View.GONE
@@ -209,7 +207,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun startVideoPlayback() {
-        Log.d(TAG, "startVideoPlayback called")
+        Log.d(TAG, "Starting video playback")
         isVideoPlaying = true
         stretchCard()
         updateFocusOverlayVisibility(true)
@@ -224,11 +222,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             .start()
     }
 
-    fun endVideoPlayback() {
-        showThumbnail()
-        shrinkCard()
-        isVideoPlaying = false
-        updateFocusOverlayVisibility(isFocused)
+    fun endVideoPlayback(shouldResetState: Boolean) {
+        Log.d(TAG, "Ending video playback, shouldResetState: $shouldResetState")
+        if (shouldResetState) {
+            resetCardState()
+        } else if (isInAdSequence) {
+            // Keep card stretched for next ad
+            videoPlaceholder.visibility = View.VISIBLE
+        }
     }
 
     private fun resizeCard(stretch: Boolean) {
@@ -280,7 +281,9 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     fun resetCardState() {
+        Log.d(TAG, "Resetting card state")
         isVideoPlaying = false
+        isInAdSequence = false
         videoPlaceholder.visibility = View.GONE
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE

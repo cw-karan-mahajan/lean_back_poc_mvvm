@@ -14,20 +14,21 @@ class VastAdSequenceManager @Inject constructor(
 ) {
     private var currentSequence = mutableListOf<VastParser.VastAd>()
     private var currentIndex = 0
-    private var isPlaying = false
+    private var totalAds = 0
 
     suspend fun prepareAdSequence(vastUrl: String, tileId: String): Boolean {
         currentSequence.clear()
         currentIndex = 0
+        totalAds = 0
 
         try {
             val vastAds = vastParser.parseVastUrl(vastUrl, tileId)
             if (vastAds.isNullOrEmpty()) return false
 
-            // Sort by sequence number and filter valid ads
             currentSequence.addAll(vastAds.sortedBy { it.sequence }
                 .filter { vastMediaSelector.selectLowestBitrateMediaFile(it) != null })
 
+            totalAds = currentSequence.size
             return currentSequence.isNotEmpty()
         } catch (e: Exception) {
             Log.e(TAG, "Error preparing ad sequence: ${e.message}")
@@ -35,7 +36,7 @@ class VastAdSequenceManager @Inject constructor(
         }
     }
 
-    fun getCurrentAd(): VastParser.VastAd? {
+   private fun getCurrentAd(): VastParser.VastAd? {
         return if (currentIndex < currentSequence.size) currentSequence[currentIndex] else null
     }
 
@@ -45,7 +46,9 @@ class VastAdSequenceManager @Inject constructor(
         }
     }
 
-    fun hasNextAd(): Boolean = currentIndex < currentSequence.size - 1
+    fun hasNextAd(): Boolean = currentIndex < totalAds - 1
+
+    fun isLastAd(): Boolean = currentIndex == totalAds - 1
 
     fun moveToNextAd(): Boolean {
         if (hasNextAd()) {
@@ -66,7 +69,7 @@ class VastAdSequenceManager @Inject constructor(
     fun reset() {
         currentSequence.clear()
         currentIndex = 0
-        isPlaying = false
+        totalAds = 0
     }
 
     companion object {
