@@ -50,6 +50,7 @@ class AdEventTracker @Inject constructor(
                     val request = Request.Builder()
                         .url(url)
                         .build()
+
                     httpClient.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
                             Log.d(TAG, "Successfully tracked event: $jobKey")

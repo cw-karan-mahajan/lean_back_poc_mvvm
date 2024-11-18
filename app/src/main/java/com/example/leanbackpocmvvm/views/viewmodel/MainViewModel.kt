@@ -287,7 +287,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleAdSequenceVideoEnd(tileId: String) {
-        vastAdSequenceManager.completeCurrentAd()
+        //vastAdSequenceManager.completeCurrentAd()
 
         if (vastAdSequenceManager.hasNextAd()) {
             Log.d(TAG, "Moving to next ad in sequence")

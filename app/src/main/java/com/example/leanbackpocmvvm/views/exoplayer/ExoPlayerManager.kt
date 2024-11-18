@@ -104,9 +104,11 @@ class ExoPlayerManager @Inject constructor(
                     delay(100)
                 }
 
-                if (isPlayingVideo.get()) {
-                    if (!isPartOfSequence) {
-                        releasePlayer()
+                when {
+                    isPlayingVideo.get() -> {
+                        if (!isPartOfSequence) {
+                            releasePlayer()
+                        }
                     }
                 }
 
@@ -135,6 +137,7 @@ class ExoPlayerManager @Inject constructor(
                                 isPlayingVideo.set(true)
                                 hasVideoEnded.set(false)
                             }
+
                             Player.STATE_ENDED -> {
                                 if (!isPartOfSequence) {
                                     releasePlayer()
@@ -154,10 +157,12 @@ class ExoPlayerManager @Inject constructor(
                             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
                                 player.prepare()
                             }
+
                             PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
                                 player.seekToDefaultPosition()
                                 player.prepare()
                             }
+
                             else -> {
                                 player.stop()
                                 player.clearMediaItems()
@@ -178,25 +183,21 @@ class ExoPlayerManager @Inject constructor(
     }
 
     private fun setupTrackingListener(vastAd: VastParser.VastAd) {
-        var hasCompletedTracking = false
 
         exoPlayer?.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 when (state) {
                     Player.STATE_READY -> {
                         if (!hasTrackedEvent(vastAd.id, VastParser.VastAd.EVENT_START)) {
-                            Log.d(TAG, "Tracking start event for ad ${vastAd.id}")
                             vastTrackingManager.trackEvent(vastAd, VastParser.VastAd.EVENT_START)
                             markEventTracked(vastAd.id, VastParser.VastAd.EVENT_START)
-
                             // Start progress monitoring
                             startProgressMonitoring(vastAd)
                         }
                     }
+
                     Player.STATE_ENDED -> {
-                        if (!hasCompletedTracking) {
-                            hasCompletedTracking = true
-                            Log.d(TAG, "Tracking complete event for ad ${vastAd.id}")
+                        if (!hasTrackedEvent(vastAd.id, VastParser.VastAd.EVENT_COMPLETE)) {
                             vastTrackingManager.trackEvent(vastAd, VastParser.VastAd.EVENT_COMPLETE)
                             markEventTracked(vastAd.id, VastParser.VastAd.EVENT_COMPLETE)
                             clearTrackedEvents(vastAd.id)
@@ -223,17 +224,26 @@ class ExoPlayerManager @Inject constructor(
 
                         if (!trackedFirstQuartile && percentage >= 25) {
                             Log.d(TAG, "Tracking first quartile for ad ${vastAd.id}")
-                            vastTrackingManager.trackQuartile(vastAd, VastParser.VastAd.EVENT_FIRST_QUARTILE)
+                            vastTrackingManager.trackQuartile(
+                                vastAd,
+                                VastParser.VastAd.EVENT_FIRST_QUARTILE
+                            )
                             trackedFirstQuartile = true
                         }
                         if (!trackedMidpoint && percentage >= 50) {
                             Log.d(TAG, "Tracking midpoint for ad ${vastAd.id}")
-                            vastTrackingManager.trackQuartile(vastAd, VastParser.VastAd.EVENT_MIDPOINT)
+                            vastTrackingManager.trackQuartile(
+                                vastAd,
+                                VastParser.VastAd.EVENT_MIDPOINT
+                            )
                             trackedMidpoint = true
                         }
                         if (!trackedThirdQuartile && percentage >= 75) {
                             Log.d(TAG, "Tracking third quartile for ad ${vastAd.id}")
-                            vastTrackingManager.trackQuartile(vastAd, VastParser.VastAd.EVENT_THIRD_QUARTILE)
+                            vastTrackingManager.trackQuartile(
+                                vastAd,
+                                VastParser.VastAd.EVENT_THIRD_QUARTILE
+                            )
                             trackedThirdQuartile = true
                         }
                     }
