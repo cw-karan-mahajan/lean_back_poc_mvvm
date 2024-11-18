@@ -20,18 +20,8 @@ class AdEventTracker @Inject constructor(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val trackingJobs = ConcurrentHashMap<String, Job>()
 
-    fun trackImpression(vastAd: VastAd) {
-        fireTrackingPixel(vastAd.impression, "impression_${vastAd.id}")
-    }
-
     fun trackEvent(url: String, eventType: String, vastAdId: String) {
         fireTrackingPixel(url, "${eventType}_${vastAdId}")
-    }
-
-    fun trackQuartile(vastAd: VastAd, quartileEvent: String) {
-        vastAd.trackingEvents[quartileEvent]?.let { url ->
-            fireTrackingPixel(url, "${quartileEvent}_${vastAd.id}")
-        }
     }
 
     fun trackClick(vastAd: VastAd) {
@@ -60,7 +50,6 @@ class AdEventTracker @Inject constructor(
                     val request = Request.Builder()
                         .url(url)
                         .build()
-
                     httpClient.newCall(request).execute().use { response ->
                         if (response.isSuccessful) {
                             Log.d(TAG, "Successfully tracked event: $jobKey")
@@ -89,67 +78,6 @@ class AdEventTracker @Inject constructor(
                     Log.e(TAG, "Tracking job completed with error: ${it.message}")
                 }
             }
-        }
-    }
-
-    fun trackAllQuartiles(vastAd: VastAd, position: Long, duration: Long) {
-        val percentage = if (duration > 0) (position * 100) / duration else 0
-
-        when {
-            percentage >= 25 && percentage < 50 ->
-                trackQuartile(vastAd, VastAd.EVENT_FIRST_QUARTILE)
-            percentage >= 50 && percentage < 75 ->
-                trackQuartile(vastAd, VastAd.EVENT_MIDPOINT)
-            percentage >= 75 ->
-                trackQuartile(vastAd, VastAd.EVENT_THIRD_QUARTILE)
-        }
-    }
-
-    fun startTracking(vastAd: VastAd) {
-        trackImpression(vastAd)
-        trackEvent(
-            vastAd.trackingEvents[VastAd.EVENT_START] ?: return,
-            VastAd.EVENT_START,
-            vastAd.id
-        )
-    }
-
-    fun completeTracking(vastAd: VastAd) {
-        vastAd.trackingEvents[VastAd.EVENT_COMPLETE]?.let { url ->
-            trackEvent(url, VastAd.EVENT_COMPLETE, vastAd.id)
-        }
-    }
-
-    fun cancelAllTracking() {
-        trackingJobs.forEach { (_, job) -> job.cancel() }
-        trackingJobs.clear()
-    }
-
-    fun cancelTracking(vastAdId: String) {
-        trackingJobs.entries.removeIf { (key, job) ->
-            if (key.endsWith(vastAdId)) {
-                job.cancel()
-                true
-            } else false
-        }
-    }
-
-    private suspend fun retryWithBackoff(
-        times: Int = retryAttempts,
-        initialDelayMs: Long = retryDelayMs,
-        maxDelayMs: Long = 5000L,
-        block: suspend () -> Unit
-    ) {
-        var currentDelay = initialDelayMs
-        repeat(times) { attempt ->
-            try {
-                block()
-                return
-            } catch (e: Exception) {
-                Log.e(TAG, "Attempt ${attempt + 1}/$times failed: ${e.message}")
-            }
-            delay(currentDelay)
-            currentDelay = (currentDelay * 2).coerceAtMost(maxDelayMs)
         }
     }
 

@@ -11,6 +11,7 @@ import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.impl.AdRepositoryImpl
 import com.example.leanbackpocmvvm.utils.Network
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
+import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
@@ -126,8 +127,8 @@ object AppModule {
     @Provides
     @Singleton
     fun provideExoPlayerManager(
-        @ApplicationContext context: Context
+        @ApplicationContext context: Context, vastTrackingManager: VastTrackingManager
     ): ExoPlayerManager {
-        return ExoPlayerManager(context)
+        return ExoPlayerManager(context, vastTrackingManager)
     }
 }

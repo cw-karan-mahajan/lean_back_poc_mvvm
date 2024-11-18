@@ -36,7 +36,7 @@ class VastAdSequenceManager @Inject constructor(
         }
     }
 
-   private fun getCurrentAd(): VastParser.VastAd? {
+    fun getCurrentAd(): VastParser.VastAd? {
         return if (currentIndex < currentSequence.size) currentSequence[currentIndex] else null
     }
 
@@ -56,10 +56,6 @@ class VastAdSequenceManager @Inject constructor(
             return true
         }
         return false
-    }
-
-    fun startTracking() {
-        getCurrentAd()?.let { vastTrackingManager.startTracking(it) }
     }
 
     fun completeCurrentAd() {

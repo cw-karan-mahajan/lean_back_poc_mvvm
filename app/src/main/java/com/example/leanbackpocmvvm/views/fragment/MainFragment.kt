@@ -206,6 +206,11 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         cardView.prepareForVideoPlayback(isPartOfSequence)
         cardView.videoPlaceholder.addView(sharedPlayerView)
 
+        // Get current VAST ad if available
+        val currentVastAd = if (isPartOfSequence) {
+            viewModel.vastAdSequenceManager.getCurrentAd()
+        } else null
+
         exoPlayerManager.prepareVideo(
             videoUrl = videoUrl,
             playerView = sharedPlayerView,
@@ -217,7 +222,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             onEnded = {
                 viewModel.onVideoEnded(tileId)
             },
-            isPartOfSequence = isPartOfSequence
+            isPartOfSequence = isPartOfSequence,
+            vastAd = currentVastAd
         )
     }
 
@@ -453,7 +459,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                                 rowPartiallyVisibleItemsCount++
                         }
                     }
-                    Log.d(
+                    /*Log.d(
                         TAG,
                         "Row $i, Item $j - Fully visible: ${
                             isViewFullyVisible(
@@ -466,25 +472,25 @@ class MainFragment : BrowseSupportFragment(), isConnected {
                                 itemView
                             )
                         }"
-                    )
+                    )*/
                 }
 
                 totalFullyVisibleItemsCount += rowFullyVisibleItemsCount
                 totalPartiallyVisibleItemsCount += rowPartiallyVisibleItemsCount
 
-                Log.d(
+                /*Log.d(
                     TAG,
                     "Row $i - Total items: $rowItemCount, Visible items: $rowVisibleItemCount," +
                             " Fully visible items: $rowFullyVisibleItemsCount, Partially visible items:" +
                             " $rowPartiallyVisibleItemsCount"
-                )
+                )*/
             } else {
                 Log.d(TAG, "Row $i - HorizontalGridView not found")
             }
         }
 
-        Log.d(TAG, "Total fully visible items across all rows: $totalFullyVisibleItemsCount")
-        Log.d(
+        //Log.d(TAG, "Total fully visible items across all rows: $totalFullyVisibleItemsCount")
+        /*Log.d(
             TAG,
             "Total partially visible items across all rows: $totalPartiallyVisibleItemsCount"
         )
@@ -492,10 +498,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             TAG,
             "Total visible items (fully + partially) across all rows: " +
                     "${totalFullyVisibleItemsCount + totalPartiallyVisibleItemsCount}"
-        )
+        )*/
 
-        // Log the height of the VerticalGridView
-        Log.d(TAG, "VerticalGridView height: ${verticalGridView.height}")
     }
 
     private fun findHorizontalGridView(view: View): HorizontalGridView? {
@@ -548,29 +552,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         verticalGridView.post {
             Log.d(TAG, "Forced layout pass, updating count")
             updateVisibleItemsCount(verticalGridView)
-        }
-    }
-
-    private fun preloadVisibleItems() {
-        val verticalGridView =
-            view?.findViewById<VerticalGridView>(androidx.leanback.R.id.container_list)
-        if (verticalGridView == null) return
-
-        val layoutManager = verticalGridView.layoutManager as? LinearLayoutManager ?: return
-        val firstVisiblePosition = layoutManager.findFirstVisibleItemPosition()
-        val lastVisiblePosition = layoutManager.findLastVisibleItemPosition()
-
-
-        if (firstVisiblePosition == RecyclerView.NO_POSITION || lastVisiblePosition == RecyclerView.NO_POSITION) return
-
-        for (i in firstVisiblePosition..lastVisiblePosition) {
-            val row = rowsAdapter.get(i) as? ListRow ?: continue
-            val adapter = row.adapter as? ArrayObjectAdapter ?: continue
-
-            for (j in 0 until adapter.size()) {
-                val item = adapter.get(j) as? CustomRowItemX ?: continue
-                viewModel.preloadVideo(item)
-            }
         }
     }
 

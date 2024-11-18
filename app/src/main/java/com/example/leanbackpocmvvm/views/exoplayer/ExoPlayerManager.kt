@@ -21,9 +21,13 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.ui.PlayerView
 import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
+import com.example.leanbackpocmvvm.vastdata.parser.VastParser
+import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import java.io.File
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,12 +35,16 @@ import javax.inject.Singleton
 @UnstableApi
 @Singleton
 class ExoPlayerManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val vastTrackingManager: VastTrackingManager
 ) {
     private var exoPlayer: ExoPlayer? = null
     private var isPlayingVideo = AtomicBoolean(false)
     private var hasVideoEnded = AtomicBoolean(false)
     private var currentVideoUrl = ""
+    private val trackedEvents = ConcurrentHashMap<String, MutableSet<String>>()
+    private var currentVastAd: VastParser.VastAd? = null
+
     private val simpleCache: SimpleCache by lazy {
         val cacheSize = if (Build.VERSION.SDK_INT == Build.VERSION_CODES.P) {
             50 * 1024 * 1024 // 50 MB for Android 9
@@ -59,12 +67,32 @@ class ExoPlayerManager @Inject constructor(
         return exoPlayer!!
     }
 
+    private fun hasTrackedEvent(vastAdId: String, event: String): Boolean {
+        return trackedEvents.getOrPut(vastAdId) {
+            Collections.newSetFromMap(ConcurrentHashMap())
+        }.contains(event)
+    }
+
+    private fun markEventTracked(vastAdId: String, event: String) {
+        trackedEvents.getOrPut(vastAdId) {
+            Collections.newSetFromMap(ConcurrentHashMap())
+        }.add(event)
+    }
+
+    private fun setCurrentVastAd(vastAd: VastParser.VastAd?) {
+        currentVastAd = vastAd
+        if (vastAd == null) {
+            clearAllTracking()
+        }
+    }
+
     fun prepareVideo(
         videoUrl: String,
         playerView: PlayerView,
         onReady: (Boolean) -> Unit,
         onEnded: () -> Unit,
-        isPartOfSequence: Boolean = false
+        isPartOfSequence: Boolean = false,
+        vastAd: VastParser.VastAd? = null
     ) {
         playerScope.launch {
             if (exoPlayer == null || exoPlayer?.playbackState == Player.STATE_IDLE) {
@@ -77,12 +105,12 @@ class ExoPlayerManager @Inject constructor(
                 }
 
                 if (isPlayingVideo.get()) {
-                    // If not part of sequence, release player
                     if (!isPartOfSequence) {
                         releasePlayer()
                     }
                 }
 
+                setCurrentVastAd(vastAd)
                 val player = getOrCreatePlayer()
                 playerView.player = player
 
@@ -96,6 +124,9 @@ class ExoPlayerManager @Inject constructor(
                 player.setMediaSource(source)
                 player.prepare()
 
+                // Setup tracking listener if we have a VAST ad
+                vastAd?.let { setupTrackingListener(it) }
+
                 player.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         when (state) {
@@ -105,7 +136,6 @@ class ExoPlayerManager @Inject constructor(
                                 hasVideoEnded.set(false)
                             }
                             Player.STATE_ENDED -> {
-                                // Only release player if not part of sequence
                                 if (!isPartOfSequence) {
                                     releasePlayer()
                                 }
@@ -119,7 +149,6 @@ class ExoPlayerManager @Inject constructor(
                     override fun onPlayerError(error: PlaybackException) {
                         Log.e(TAG, "Player error: ${error.message}", error)
                         onReady(false)
-                        // Attempt to recover from the error
                         when (error.errorCode) {
                             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
@@ -148,26 +177,73 @@ class ExoPlayerManager @Inject constructor(
         }
     }
 
-    /*fun preloadVideo(videoUrl: String) {
-        playerScope.launch(Dispatchers.IO) {
-            try {
-                val dataSourceFactory = DefaultDataSource.Factory(context)
-                val cacheDataSourceFactory = CacheDataSource.Factory()
-                    .setCache(simpleCache)
-                    .setUpstreamDataSourceFactory(dataSourceFactory)
-                val mediaSource = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(videoUrl))
+    private fun setupTrackingListener(vastAd: VastParser.VastAd) {
+        var hasCompletedTracking = false
 
-                withContext(Dispatchers.Main) {
-                    val player = getOrCreatePlayer()
-                    player.setMediaSource(mediaSource)
-                    player.prepare()
+        exoPlayer?.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                when (state) {
+                    Player.STATE_READY -> {
+                        if (!hasTrackedEvent(vastAd.id, VastParser.VastAd.EVENT_START)) {
+                            Log.d(TAG, "Tracking start event for ad ${vastAd.id}")
+                            vastTrackingManager.trackEvent(vastAd, VastParser.VastAd.EVENT_START)
+                            markEventTracked(vastAd.id, VastParser.VastAd.EVENT_START)
+
+                            // Start progress monitoring
+                            startProgressMonitoring(vastAd)
+                        }
+                    }
+                    Player.STATE_ENDED -> {
+                        if (!hasCompletedTracking) {
+                            hasCompletedTracking = true
+                            Log.d(TAG, "Tracking complete event for ad ${vastAd.id}")
+                            vastTrackingManager.trackEvent(vastAd, VastParser.VastAd.EVENT_COMPLETE)
+                            markEventTracked(vastAd.id, VastParser.VastAd.EVENT_COMPLETE)
+                            clearTrackedEvents(vastAd.id)
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    private fun startProgressMonitoring(vastAd: VastParser.VastAd) {
+        var trackedFirstQuartile = false
+        var trackedMidpoint = false
+        var trackedThirdQuartile = false
+
+        playerScope.launch {
+            try {
+                while (isActive && exoPlayer != null) {
+                    val duration = exoPlayer?.duration ?: 0
+                    val position = exoPlayer?.currentPosition ?: 0
+
+                    if (duration > 0) {
+                        val percentage = (position * 100.0) / duration
+
+                        if (!trackedFirstQuartile && percentage >= 25) {
+                            Log.d(TAG, "Tracking first quartile for ad ${vastAd.id}")
+                            vastTrackingManager.trackQuartile(vastAd, VastParser.VastAd.EVENT_FIRST_QUARTILE)
+                            trackedFirstQuartile = true
+                        }
+                        if (!trackedMidpoint && percentage >= 50) {
+                            Log.d(TAG, "Tracking midpoint for ad ${vastAd.id}")
+                            vastTrackingManager.trackQuartile(vastAd, VastParser.VastAd.EVENT_MIDPOINT)
+                            trackedMidpoint = true
+                        }
+                        if (!trackedThirdQuartile && percentage >= 75) {
+                            Log.d(TAG, "Tracking third quartile for ad ${vastAd.id}")
+                            vastTrackingManager.trackQuartile(vastAd, VastParser.VastAd.EVENT_THIRD_QUARTILE)
+                            trackedThirdQuartile = true
+                        }
+                    }
+                    delay(200) // Check every 200ms
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error preloading video: ${e.message}")
+                Log.e(TAG, "Error monitoring progress: ${e.message}")
             }
         }
-    }*/
+    }
 
     private fun createExoPlayer(): ExoPlayer {
         val renderersFactory = DefaultRenderersFactory(context).apply {
@@ -230,12 +306,25 @@ class ExoPlayerManager @Inject constructor(
         }
     }
 
+    fun clearTrackedEvents(vastAdId: String) {
+        trackedEvents.remove(vastAdId)
+    }
+
+    fun clearAllTracking() {
+        trackedEvents.clear()
+        currentVastAd = null
+    }
+
     fun releasePlayer() {
         if (isReleasing.getAndSet(true)) {
             return
         }
         playerScope.launch {
             try {
+                clearAllTracking()
+                currentVastAd?.let { vastAd ->
+                    vastTrackingManager.cancelTracking(vastAd.id)
+                }
                 exoPlayer?.run {
                     stop()
                     clearMediaItems()
@@ -256,9 +345,9 @@ class ExoPlayerManager @Inject constructor(
         exoPlayer = createExoPlayer()
     }
 
-    fun isPlayerReleased(): Boolean = exoPlayer == null
-
     fun onLifecycleDestroy() {
+        clearAllTracking()
+        vastTrackingManager.cancelAllTracking()
         releasePlayer()
         playerScope.cancel()
     }

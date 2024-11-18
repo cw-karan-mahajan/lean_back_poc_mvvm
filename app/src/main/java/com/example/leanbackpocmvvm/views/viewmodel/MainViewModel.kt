@@ -14,6 +14,8 @@ import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.repository.VastRepository
 import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
+import com.example.leanbackpocmvvm.vastdata.parser.VastParser
+import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
@@ -32,7 +34,8 @@ class MainViewModel @Inject constructor(
     private val adRepository: AdRepository,
     private val exoPlayerManager: ExoPlayerManager,
     private val vastRepository: VastRepository,
-    private val vastAdSequenceManager: VastAdSequenceManager
+    val vastAdSequenceManager: VastAdSequenceManager,
+    private val vastTrackingManager: VastTrackingManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
@@ -242,14 +245,18 @@ class MainViewModel @Inject constructor(
 
     private fun playCurrentAd(item: CustomRowItemX) {
         vastAdSequenceManager.getCurrentVideoUrl()?.let { videoUrl ->
-            vastAdSequenceManager.startTracking()
-            addPlayedVideoTileId(item.rowItemX.tid)
-            _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
-            currentlyPlayingVideoTileId = item.rowItemX.tid
-            _playVideoCommand.value = PlayVideoCommand(videoUrl, item.rowItemX.tid)
+            vastAdSequenceManager.getCurrentAd()?.let { vastAd ->
+                addPlayedVideoTileId(item.rowItemX.tid)
+                _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+                currentlyPlayingVideoTileId = item.rowItemX.tid
+                _playVideoCommand.value = PlayVideoCommand(
+                    videoUrl = videoUrl,
+                    tileId = item.rowItemX.tid,
+                    vastAd = vastAd
+                )
+            }
         }
     }
-
     private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
         cancelPendingPlayback()
         pendingVideoPlay = item
@@ -319,6 +326,13 @@ class MainViewModel @Inject constructor(
 
     fun stopVideoPlayback() {
         viewModelScope.launch(Dispatchers.Main) {
+            currentlyPlayingVideoTileId?.let { tileId ->
+                findItemByTid(tileId)?.let { item ->
+                    if (item.rowItemX.tileType == "typeAdsVideoBanner") {
+                        vastTrackingManager.cancelTracking(tileId)
+                    }
+                }
+            }
             exoPlayerManager.releasePlayer()
             _videoPlaybackState.value = VideoPlaybackState.Stopped
             currentlyPlayingVideoTileId?.let { tileId ->
@@ -577,6 +591,7 @@ class MainViewModel @Inject constructor(
         exoPlayerManager.releasePlayer()
         stopAutoScroll()
         vastAdSequenceManager.reset()
+        vastTrackingManager.cancelAllTracking()
     }
 
     fun isPlayingAdSequence(): Boolean = isPlayingAdSequence
@@ -624,7 +639,8 @@ data class ContentData(
 @OptIn(UnstableApi::class)
 data class PlayVideoCommand(
     val videoUrl: String,
-    val tileId: String
+    val tileId: String,
+    val vastAd: VastParser.VastAd? = null
 )
 
 data class AutoScrollCommand(val rowIndex: Int, val itemIndex: Int, val isJumping: Boolean)
