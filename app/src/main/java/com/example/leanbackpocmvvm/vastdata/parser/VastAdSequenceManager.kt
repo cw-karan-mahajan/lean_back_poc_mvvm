@@ -22,13 +22,21 @@ class VastAdSequenceManager @Inject constructor(
         totalAds = 0
 
         try {
-            val vastAds = vastParser.parseVastUrl(vastUrl, tileId)
-            if (vastAds.isNullOrEmpty()) return false
+            vastParser.parseVastUrl(vastUrl, tileId)
+                .fold(
+                    onSuccess = { vastAds ->
+                        currentSequence.addAll(vastAds
+                            .sortedBy { it.sequence }
+                            .filter { vastMediaSelector.selectLowestBitrateMediaFile(it) != null }
+                        )
+                        totalAds = currentSequence.size
+                    },
+                    onFailure = { error ->
+                        Log.e(TAG, "Error preparing ad sequence: ${error.message}")
+                        return false
+                    }
+                )
 
-            currentSequence.addAll(vastAds.sortedBy { it.sequence }
-                .filter { vastMediaSelector.selectLowestBitrateMediaFile(it) != null })
-
-            totalAds = currentSequence.size
             return currentSequence.isNotEmpty()
         } catch (e: Exception) {
             Log.e(TAG, "Error preparing ad sequence: ${e.message}")

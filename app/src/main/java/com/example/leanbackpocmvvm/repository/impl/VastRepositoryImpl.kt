@@ -43,7 +43,6 @@ class VastRepositoryImpl @Inject constructor(
         try {
             send(Resource.loading())
 
-            // Make API call to get VAST XML
             Log.d(TAG, "Fetching VAST XML from URL: $vastUrl")
             val vastApiService = dynamicApiServiceFactory.createService(VastApiService::class.java, vastUrl)
             val path = dynamicApiServiceFactory.extractPath(vastUrl)
@@ -63,21 +62,24 @@ class VastRepositoryImpl @Inject constructor(
 
             Log.d(TAG, "Successfully received VAST XML, now parsing...")
 
-            // Parse XML using existing vastParser
-            val vastAds = withTimeout(TIMEOUT_MS) {
-                vastParser.parseVastUrl(vastUrl, tileId)
-            }
-
-            if (!vastAds.isNullOrEmpty()) {
-                Log.d(TAG, "Successfully parsed ${vastAds.size} VAST ads")
-                vastAds.forEachIndexed { index, vastAd ->
-                    Log.d(TAG, "Processing Ad ${index + 1} of ${vastAds.size}")
-                    logVastAdDetails(vastAd)
-                }
-                send(Resource.success(vastAds))
-            } else {
-                send(Resource.error("Failed to parse VAST XML"))
-            }
+            vastParser.parseVastUrl(vastUrl, tileId)
+                .fold(
+                    onSuccess = { vastAds ->
+                        if (vastAds.isNotEmpty()) {
+                            Log.d(TAG, "Successfully parsed ${vastAds.size} VAST ads")
+                            vastAds.forEachIndexed { index, vastAd ->
+                                Log.d(TAG, "Processing Ad ${index + 1} of ${vastAds.size}")
+                                logVastAdDetails(vastAd)
+                            }
+                            send(Resource.success(vastAds))
+                        } else {
+                            send(Resource.error("No valid VAST ads found"))
+                        }
+                    },
+                    onFailure = { error ->
+                        send(Resource.error("Error parsing VAST: ${error.message}"))
+                    }
+                )
 
         } catch (e: TimeoutCancellationException) {
             send(Resource.error("VAST parsing timeout"))
@@ -107,7 +109,7 @@ class VastRepositoryImpl @Inject constructor(
             withContext(Dispatchers.IO) {
                 httpClient.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
-                        send(Resource.success(true))
+                        send(Resource.success<Boolean>(true))
                     } else {
                         send(Resource.error<Boolean>("Failed to track event: ${response.code}"))
                     }
@@ -134,7 +136,6 @@ class VastRepositoryImpl @Inject constructor(
         try {
             send(Resource.loading())
 
-            // First fetch VAST XML
             val vastApiService = dynamicApiServiceFactory.createService(VastApiService::class.java, vastUrl)
             val path = dynamicApiServiceFactory.extractPath(vastUrl)
             val queryParams = dynamicApiServiceFactory.extractQueryParams(vastUrl)
@@ -145,22 +146,24 @@ class VastRepositoryImpl @Inject constructor(
                 return@channelFlow
             }
 
-            // Then parse and preload
-            val vastAds = withTimeout(TIMEOUT_MS) {
-                vastParser.parseVastUrl(vastUrl, tileId)
-            }
-
-            if (!vastAds.isNullOrEmpty()) {
-                // Preload the first media file of each ad
-                vastAds.forEach { vastAd ->
-                    vastAd.mediaFiles.firstOrNull()?.let { mediaFile ->
-                        preloadMedia(mediaFile.url)
+            vastParser.parseVastUrl(vastUrl, tileId)
+                .fold(
+                    onSuccess = { vastAds ->
+                        if (vastAds.isNotEmpty()) {
+                            vastAds.forEach { vastAd ->
+                                vastAd.mediaFiles.firstOrNull()?.let { mediaFile ->
+                                    preloadMedia(mediaFile.url)
+                                }
+                            }
+                            send(Resource.success(vastAds))
+                        } else {
+                            send(Resource.error("No valid VAST ads found for preload"))
+                        }
+                    },
+                    onFailure = { error ->
+                        send(Resource.error("Error parsing VAST for preload: ${error.message}"))
                     }
-                }
-                send(Resource.success(vastAds))
-            } else {
-                send(Resource.error("Failed to preload VAST XML"))
-            }
+                )
 
         } catch (e: Exception) {
             Log.e(TAG, "Error preloading VAST for tileId: $tileId", e)
@@ -172,7 +175,7 @@ class VastRepositoryImpl @Inject constructor(
         try {
             val request = Request.Builder()
                 .url(url)
-                .head()  // Only get headers to check availability
+                .head()
                 .build()
 
             withContext(Dispatchers.IO) {
@@ -197,7 +200,6 @@ class VastRepositoryImpl @Inject constructor(
         Log.d(TAG, "Ad Title: ${vastAd.adTitle}")
         Log.d(TAG, "Duration: ${vastAd.duration}")
 
-        // Log MediaFiles
         Log.d(TAG, "------- MediaFiles (${vastAd.mediaFiles.size}) -------")
         vastAd.mediaFiles.forEach { mediaFile ->
             Log.d(TAG, """
@@ -210,25 +212,21 @@ class VastRepositoryImpl @Inject constructor(
             """.trimIndent())
         }
 
-        // Log Tracking Events
         Log.d(TAG, "------- Tracking Events -------")
         vastAd.trackingEvents.forEach { (event, url) ->
             Log.d(TAG, "Event: $event -> URL: $url")
         }
 
-        // Log Click Information
         Log.d(TAG, "------- Click Information -------")
         Log.d(TAG, "ClickThrough: ${vastAd.clickThrough}")
         Log.d(TAG, "ClickTracking: ${vastAd.clickTracking}")
 
-        // Log Extensions if any
         if (vastAd.extensions.isNotEmpty()) {
             Log.d(TAG, "------- Extensions -------")
             vastAd.extensions.forEach { (key, value) ->
                 Log.d(TAG, "$key: $value")
             }
         }
-
         Log.d(TAG, "===================================")
     }
 
@@ -251,11 +249,12 @@ class VastRepositoryImpl @Inject constructor(
         }
     }
 
+
+
     companion object {
         private const val TAG = "VastRepositoryImpl"
-        private const val TIMEOUT_MS = 10000L // 10 seconds
+        private const val TIMEOUT_MS = 10000L
         private const val MAX_RETRY_ATTEMPTS = 3
-        private const val RETRY_DELAY_MS = 1000L // 1 second
+        private const val RETRY_DELAY_MS = 1000L
     }
 }
-
