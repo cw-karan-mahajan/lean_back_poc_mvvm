@@ -25,13 +25,6 @@ class VastTrackingManager @Inject constructor(
     fun trackEvent(vastAd: VastParser.VastAd, eventType: String) {
         val trackingKey = "${eventType}_${vastAd.id}"
 
-        /*
-        if (eventType == VastParser.VastAd.EVENT_COMPLETE &&
-            completedEvents.putIfAbsent(vastAd.id, true) == true) {
-            Log.d(TAG, "Complete event already tracked for ad ${vastAd.id}")
-            return
-        }*/
-
         activeTracking[trackingKey]?.let { existingJob ->
             existingJob.cancel(CancellationException("New tracking started"))
         }
@@ -44,7 +37,7 @@ class VastTrackingManager @Inject constructor(
                         retryWithBackoff {
                             adEventTracker.trackEvent(url, eventType, vastAd.id)
                         }
-                        Log.d(TAG, "Successfully tracked event: ${eventType}_${vastAd.id}")
+                        //Log.d(TAG, "Successfully tracked event: ${eventType}_${vastAd.id}")
                     } catch (e: CancellationException) {
                         Log.d(TAG, "Tracking cancelled for event: ${eventType}_${vastAd.id}")
                         if (eventType == VastParser.VastAd.EVENT_COMPLETE) {

@@ -10,6 +10,7 @@ import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 
 @Singleton
 class VastMediaSelector @Inject constructor(
@@ -116,8 +117,8 @@ class VastMediaSelector @Inject constructor(
         val screenHeight = displayMetrics.heightPixels
 
         // Calculate how close the resolution is to screen resolution
-        val widthDiff = Math.abs(screenWidth - width)
-        val heightDiff = Math.abs(screenHeight - height)
+        val widthDiff = abs(screenWidth - width)
+        val heightDiff = abs(screenHeight - height)
 
         // Convert to a score where closer to screen resolution is better
         return (1000 - (widthDiff + heightDiff) / 2).coerceAtLeast(0)
@@ -137,11 +138,11 @@ class VastMediaSelector @Inject constructor(
         }
     }
 
-    fun isMediaSupported(mediaFile: VastParser.MediaFile): Boolean {
+    /*fun isMediaSupported(mediaFile: VastParser.MediaFile): Boolean {
         return mediaFile.type in preferredMimeTypes &&
                 areDimensionsSuitable(mediaFile.width, mediaFile.height) &&
                 mediaFile.bitrate <= maxBitrate
-    }
+    }*/
 
     companion object {
         private const val TAG = "VastMediaSelector"

@@ -27,7 +27,7 @@ class VastAdSequenceManager @Inject constructor(
                     onSuccess = { vastAds ->
                         currentSequence.addAll(vastAds
                             .sortedBy { it.sequence }
-                            .filter { vastMediaSelector.selectLowestBitrateMediaFile(it) != null }
+                            .filter { vastMediaSelector.selectBestMediaFile(it) != null }
                         )
                         totalAds = currentSequence.size
                     },
@@ -50,7 +50,7 @@ class VastAdSequenceManager @Inject constructor(
 
     fun getCurrentVideoUrl(): String? {
         return getCurrentAd()?.let { ad ->
-            vastMediaSelector.selectLowestBitrateMediaFile(ad)?.url
+            vastMediaSelector.selectBestMediaFile(ad)?.url
         }
     }
 
