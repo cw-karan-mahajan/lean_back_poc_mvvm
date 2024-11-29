@@ -1,0 +1,45 @@
+apply plugin: "org.sonarqube"
+
+sonarqube {
+    properties {
+        property "sonar.host.url", "https://sonar.do.cloudwalker.tv/"
+        property "sonar.projectKey", "LeanBackPocMvvm"
+        property "sonar.projectName", "LeanBackPocMvvm"
+        property "sonar.login", "admin"
+        property "sonar.token", "sqp_4f53ef5f842249f852a15749394210d35f30c38a"
+        property "sonar.password", "cwt@123"
+
+        property "sonar.sources", "src/main/java"
+        property "sonar.tests", "src/test/java"
+
+        property "sonar.sourceEncoding", "UTF-8"
+        property "sonar.java.source", "1.8"
+
+        property "sonar.java.binaries", "${project.layout.buildDirectory}/intermediates/javac/debug"
+        property "sonar.java.test.binaries", "${project.layout.buildDirectory}/intermediates/javac/debugUnitTest"
+
+        property "sonar.java.coveragePlugin", "jacoco"
+        property "sonar.coverage.jacoco.xmlReportPaths", "${project.layout.buildDirectory}/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
+
+        property "sonar.verbose", "true"
+
+        // Add Git SCM provider configuration
+        property "sonar.scm.provider", "git"
+        property "sonar.scm.forceReloadAll", "true"
+        property "sonar.scm.exclusions.disabled", "true"
+
+        // Updated exclusions
+        property "sonar.exclusions", "**/*.gradle,**/gradle/**/*,**/build/**/*," +
+        "**/androidTest/**/*,**/*Activity.kt,**/*Fragment.kt," +
+                "**/*Layout.kt,**/utils/GetAllAppsWorker.kt,**/utils/ResourcesUtils.kt"
+
+        property "sonar.coverage.exclusions", "**/*.gradle,**/gradle/**/*,**/build/**/*," +
+        "**/androidTest/**/*,**/*Activity.kt,**/*Fragment.kt,**/*Layout.kt," +
+                "**/utils/GetAllAppsWorker.kt,**/utils/ResourcesUtils.kt"
+
+        property "sonar.test.inclusions", "**/*Test.java,**/*Test.kt"
+    }
+}
+
+// Ensure JaCoCo test report is generated before SonarQube analysis
+tasks.sonarqube.dependsOn 'jacocoTestReport'

@@ -4,7 +4,10 @@ plugins {
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android")
     id("dagger.hilt.android.plugin")
+    id("jacoco")
 }
+
+apply(from = "../sonar.gradle")
 
 android {
     namespace = "com.example.leanbackpocmvvm"
@@ -22,6 +25,7 @@ android {
         debug {
             isDebuggable = true
             isMinifyEnabled = false
+            isTestCoverageEnabled = true
         }
         release {
             isMinifyEnabled = false
@@ -42,6 +46,16 @@ android {
     buildFeatures {
         dataBinding = true
         viewBinding = true
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+            all {
+                it.useJUnitPlatform()
+            }
+        }
     }
 }
 
@@ -88,4 +102,97 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
 
+    // Testing Dependencies
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.2")
+
+    // Mockk for Kotlin
+    testImplementation("io.mockk:mockk:1.12.5")
+
+    // Coroutines Testing
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.1")
+
+    // AndroidX Test
+    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.test.ext:junit:1.1.5")
+
+    // Architecture Components Testing
+    testImplementation("androidx.arch.core:core-testing:2.2.0")
+
+    // Hilt Testing
+    testImplementation("com.google.dagger:hilt-android-testing:2.50")
+    kaptTest("com.google.dagger:hilt-android-compiler:2.50")
+
 }
+
+// In build.gradle.kts
+
+jacoco {
+    toolVersion = "0.8.7"
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+    }
+//    configure<JacocoTaskExtension> {
+//        isIncludeNoLocationClasses = true
+//        excludes = listOf("**/utils/GetAllAppsWorker*", "**/utils/ResourcesUtils*", "jdk.internal.*")
+//    }
+    finalizedBy("jacocoTestReport")
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+
+    // Match your Java project structure with both Java and Kotlin source sets
+    val debugTree = fileTree("${project.layout.buildDirectory}/intermediates/javac/debug") {
+        exclude(
+            "**/R.class",
+            "**/R$*.class",
+            "**/BuildConfig.*",
+            "**/Manifest*.*",
+            "**/*Test*.*",
+            "**/*Activity*.*",
+            "**/*Fragment*.*",
+            "**/*Layout*.*",
+            "**/utils/GetAllAppsWorker*",
+            "**/utils/ResourcesUtils*"
+        )
+    }
+
+    val kotlinDebugTree = fileTree("${project.layout.buildDirectory}/tmp/kotlin-classes/debug") {
+        exclude(
+            "**/R.class",
+            "**/R$*.class",
+            "**/BuildConfig.*",
+            "**/Manifest*.*",
+            "**/*Test*.*",
+            "**/*Activity*.*",
+            "**/*Fragment*.*",
+            "**/*Layout*.*",
+            "**/utils/GetAllAppsWorker*",
+            "**/utils/ResourcesUtils*"
+        )
+    }
+
+    sourceDirectories.setFrom(files(
+        "${project.projectDir}/src/main/java",
+        "${project.projectDir}/src/main/kotlin"
+    ))
+    classDirectories.setFrom(files(debugTree, kotlinDebugTree))
+    executionData.setFrom(fileTree(project.layout.buildDirectory) {
+        include(
+            "jacoco/testDebugUnitTest.exec",
+            "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
+        )
+    })
+}
+
