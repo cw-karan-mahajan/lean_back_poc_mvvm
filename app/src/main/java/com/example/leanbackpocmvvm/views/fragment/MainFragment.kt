@@ -197,6 +197,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         stopVideoPlayback()
         currentPlayingCard = cardView
 
+        // Important: Remove from previous parent first
         (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
 
         val isPartOfSequence = cardView.customItem?.rowItemX?.let {
@@ -204,6 +205,13 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         } ?: false
 
         cardView.prepareForVideoPlayback(isPartOfSequence)
+
+        // Add these debug logs
+        Log.d(TAG, "Preparing video playback - tileId: $tileId, isSequence: $isPartOfSequence")
+        Log.d(TAG, "VideoPlaceholder visibility: ${cardView.videoPlaceholder.visibility}")
+
+        // Ensure proper view hierarchy
+        cardView.videoPlaceholder.removeAllViews()
         cardView.videoPlaceholder.addView(sharedPlayerView)
 
         // Get current VAST ad if available
@@ -211,20 +219,24 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             viewModel.vastAdSequenceManager.getCurrentAd()
         } else null
 
-        exoPlayerManager.prepareVideo(
-            videoUrl = videoUrl,
-            playerView = sharedPlayerView,
-            onReady = { isReady ->
-                if (isReady) {
-                    cardView.startVideoPlayback()
-                }
-            },
-            onEnded = {
-                viewModel.onVideoEnded(tileId)
-            },
-            isPartOfSequence = isPartOfSequence,
-            vastAd = currentVastAd
-        )
+        // Force layout pass before preparing player
+        cardView.videoPlaceholder.post {
+            exoPlayerManager.prepareVideo(
+                videoUrl = videoUrl,
+                playerView = sharedPlayerView,
+                onReady = { isReady ->
+                    if (isReady) {
+                        Log.d(TAG, "Video ready to play - tileId: $tileId")
+                        cardView.startVideoPlayback()
+                    }
+                },
+                onEnded = {
+                    viewModel.onVideoEnded(tileId)
+                },
+                isPartOfSequence = isPartOfSequence,
+                vastAd = currentVastAd
+            )
+        }
     }
 
     private fun setupEventListeners() {
@@ -556,12 +568,14 @@ class MainFragment : BrowseSupportFragment(), isConnected {
     }
 
     private fun stopVideoPlayback() {
+        Log.d(TAG, "Stopping video playback")
         exoPlayerManager.releasePlayer()
         (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
 
         currentPlayingCard?.let { card ->
             val shouldResetState = !viewModel.isPlayingAdSequence() ||
                     (viewModel.isLastAd() && !viewModel.hasNextAd())
+            Log.d(TAG, "Resetting card state - shouldReset: $shouldResetState")
             card.endVideoPlayback(shouldResetState)
         }
 

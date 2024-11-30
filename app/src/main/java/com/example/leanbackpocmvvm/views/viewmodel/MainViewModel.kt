@@ -215,10 +215,29 @@ class MainViewModel @Inject constructor(
                 } else {
                     Log.e(TAG, "Failed to prepare VAST ad sequence")
                     _toastMessage.postValue("Error loading video ad")
+                    handleVastAdFailure(item)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error handling VAST ad: ${e.message}")
                 _toastMessage.postValue("Error processing video ad")
+                handleVastAdFailure(item)
+            }
+        }
+    }
+
+    private fun handleVastAdFailure(item: CustomRowItemX) {
+        viewModelScope.launch {
+            // Reset any video playback states
+            _videoPlaybackState.value = VideoPlaybackState.Stopped
+            _resetCardCommand.value = item.rowItemX.tid
+
+            // Check if we're in an auto-scrollable row
+            isCurrentRowAutoScrollable = isAutoScrollableRow(currentPlayingRowIndex)
+
+            if (isCurrentRowAutoScrollable) {
+                // Schedule next auto-scroll after a delay
+                delay(AUTO_SCROLL_DELAY)
+                scheduleAutoScrollResume(currentPlayingRowIndex, currentPlayingItemIndex)
             }
         }
     }
@@ -246,8 +265,11 @@ class MainViewModel @Inject constructor(
     private fun playCurrentAd(item: CustomRowItemX) {
         vastAdSequenceManager.getCurrentVideoUrl()?.let { videoUrl ->
             vastAdSequenceManager.getCurrentAd()?.let { vastAd ->
+                //Log.d(TAG, "Playing ad in sequence - CurrentIndex: ${vastAdSequenceManager.getCurrentIndex()}")
+                Log.d(TAG, "Video URL: $videoUrl")
                 addPlayedVideoTileId(item.rowItemX.tid)
-                _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl)
+                val isSequenceTransition = _videoPlaybackState.value is VideoPlaybackState.SequenceContinuing
+                _videoPlaybackState.value = VideoPlaybackState.Playing(item.rowItemX.tid, videoUrl, isSequenceTransition)
                 currentlyPlayingVideoTileId = item.rowItemX.tid
                 _playVideoCommand.value = PlayVideoCommand(
                     videoUrl = videoUrl,
@@ -257,6 +279,7 @@ class MainViewModel @Inject constructor(
             }
         }
     }
+
     private fun scheduleVideoPlay(item: CustomRowItemX, rowIndex: Int, itemIndex: Int) {
         cancelPendingPlayback()
         pendingVideoPlay = item
@@ -287,8 +310,6 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleAdSequenceVideoEnd(tileId: String) {
-        //vastAdSequenceManager.completeCurrentAd()
-
         if (vastAdSequenceManager.hasNextAd()) {
             Log.d(TAG, "Moving to next ad in sequence")
             vastAdSequenceManager.moveToNextAd()
@@ -617,7 +638,7 @@ data class CustomRowItemX(val rowItemX: RowItemX, val layout: String, val rowAdT
 }
 
 sealed class VideoPlaybackState {
-    data class Playing(val itemId: String, val videoUrl: String) : VideoPlaybackState()
+    data class Playing(val itemId: String, val videoUrl: String, val isSequenceTransition: Boolean = false) : VideoPlaybackState()
     object SequenceContinuing : VideoPlaybackState()
     object Stopped : VideoPlaybackState()
 }

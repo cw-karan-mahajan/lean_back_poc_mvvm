@@ -1,11 +1,14 @@
 package com.example.leanbackpocmvvm.views.customview
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
+import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
@@ -23,8 +26,9 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private val posterImageView: ImageView
     val videoPlaceholder: FrameLayout
     private val innerLayout: FrameLayout
-    var isVideoPlaying = false
+    private var isVideoPlaying = false
     private var thumbnailOverlay: FrameLayout
+    private var hasVideoStarted = false
 
     private var originalWidth: Int = 0
     private var originalHeight: Int = 0
@@ -34,6 +38,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     private var isViewAttached = false
     var customItem: CustomRowItemX? = null
     private var isInAdSequence = false
+    private var currentAnimator: ValueAnimator? = null
+
+    private val ANIMATION_DURATION = 300L
+    private var isPreparingNextInSequence = false
 
     init {
         layoutParams = ViewGroup.LayoutParams(
@@ -100,18 +108,13 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         setOnFocusChangeListener { _, hasFocus ->
             Log.d(
                 TAG,
-                "setOnFocusChangeListener hasFocus $hasFocus  isVideoPlaying $isVideoPlaying"
+                "Focus changed: $hasFocus, isVideoPlaying: $isVideoPlaying, hasVideoStarted: $hasVideoStarted"
             )
             updateFocusOverlayVisibility(hasFocus)
-            if (hasFocus) {
-                if (isVideoPlaying) {
-                    stretchCard()
-                } else {
-                    shrinkCard()
-                }
-            } else {
-                if (!isVideoPlaying)
-                    shrinkCard()
+
+            // Handle manual focus changes without animation
+            if (!hasVideoStarted) {
+                resizeCard(false)
             }
         }
     }
@@ -125,6 +128,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         isViewAttached = false
+        currentAnimator?.cancel()
+        currentAnimator = null
         (context as? MainActivity)?.safelyUseGlide {
             GlideApp.with(context).clear(thumbnailImageView)
             GlideApp.with(context).clear(posterImageView)
@@ -144,7 +149,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         if (imageUrl != null) {
             loadRegularImage(mImageUrl, width, height)
         }
-
     }
 
     private fun loadCurrentImage() {
@@ -184,14 +188,74 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         resizeCard(false) // Initially set to non-stretched size
     }
 
+    private fun animateCardSize(stretch: Boolean, onComplete: (() -> Unit)? = null) {
+        if (!hasVideoStarted && stretch) {
+            // Don't animate if video hasn't started yet
+            updateCardSize(
+                if (stretch) stretchedWidth else originalWidth,
+                if (stretch) stretchedHeight else originalHeight
+            )
+            onComplete?.invoke()
+            return
+        }
+
+        val startWidth = width
+        val startHeight = height
+        val targetWidth = if (stretch) stretchedWidth else originalWidth
+        val targetHeight = if (stretch) stretchedHeight else originalHeight
+
+        currentAnimator?.cancel()
+
+        currentAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = ANIMATION_DURATION
+            interpolator = AccelerateDecelerateInterpolator()
+
+            addUpdateListener { animator ->
+                val progress = animator.animatedValue as Float
+                val currentWidth = startWidth + ((targetWidth - startWidth) * progress).toInt()
+                val currentHeight = startHeight + ((targetHeight - startHeight) * progress).toInt()
+
+                updateCardSize(currentWidth, currentHeight)
+            }
+
+            doOnEnd {
+                onComplete?.invoke()
+                currentAnimator = null
+            }
+
+            start()
+        }
+    }
+
+    private fun updateCardSize(width: Int, height: Int) {
+        val params = layoutParams
+        params.width = width
+        params.height = height
+        layoutParams = params
+
+        innerLayout.layoutParams = LayoutParams(width, height)
+        thumbnailImageView.layoutParams = LayoutParams(width, height)
+        posterImageView.layoutParams = LayoutParams(width, height)
+        videoPlaceholder.layoutParams = LayoutParams(width, height)
+        thumbnailOverlay.layoutParams = LayoutParams(width, height)
+    }
+
     fun prepareForVideoPlayback(isPartOfSequence: Boolean = false) {
         Log.d(TAG, "Preparing for video playback, isPartOfSequence: $isPartOfSequence")
         isInAdSequence = isPartOfSequence
+        isPreparingNextInSequence = isPartOfSequence && hasVideoStarted
+
         videoPlaceholder.visibility = View.VISIBLE
         thumbnailImageView.visibility = View.GONE
         posterImageView.visibility = View.GONE
 
-        // Create a copy of the thumbnail image
+        // Only show overlay for first ad or non-sequence videos
+        if (!isPreparingNextInSequence) {
+            setupThumbnailOverlay()
+        }
+    }
+
+    private fun setupThumbnailOverlay() {
         val thumbnailCopy = ImageView(context).apply {
             layoutParams = LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -209,57 +273,48 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     fun startVideoPlayback() {
         Log.d(TAG, "Starting video playback")
         isVideoPlaying = true
-        stretchCard()
-        updateFocusOverlayVisibility(true)
+        hasVideoStarted = true
 
-        thumbnailOverlay.animate()
-            .alpha(0f)
-            .setDuration(300)
-            .withEndAction {
-                thumbnailOverlay.visibility = View.GONE
-                thumbnailOverlay.alpha = 1f
+        // Don't animate if we're transitioning between sequence ads
+        if (!isPreparingNextInSequence) {
+            animateCardSize(true) {
+                thumbnailOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .withEndAction {
+                        thumbnailOverlay.visibility = View.GONE
+                        thumbnailOverlay.alpha = 1f
+                    }
+                    .start()
             }
-            .start()
+        } else {
+            // Just update size without animation for sequence transition
+            updateCardSize(stretchedWidth, stretchedHeight)
+            thumbnailOverlay.visibility = View.GONE
+        }
+
+        updateFocusOverlayVisibility(true)
     }
 
     fun endVideoPlayback(shouldResetState: Boolean) {
-        Log.d(TAG, "Ending video playback, shouldResetState: $shouldResetState")
-        if (shouldResetState) {
-            resetCardState()
-        } else if (isInAdSequence) {
-            // Keep card stretched for next ad
+        if (isInAdSequence) {
+            isPreparingNextInSequence = true
             videoPlaceholder.visibility = View.VISIBLE
+        } else if (shouldResetState) {
+            isVideoPlaying = false
+            hasVideoStarted = false
+            isPreparingNextInSequence = false
+            animateCardSize(false) {
+                resetCardState(skipAnimation = true)
+            }
         }
     }
 
     private fun resizeCard(stretch: Boolean) {
         val targetWidth = if (stretch) stretchedWidth else originalWidth
         val targetHeight = if (stretch) stretchedHeight else originalHeight
-
-        val params = layoutParams
-        params.width = targetWidth
-        params.height = targetHeight
-        layoutParams = params
-
-        innerLayout.layoutParams = LayoutParams(targetWidth, targetHeight)
-        thumbnailImageView.layoutParams = LayoutParams(targetWidth, targetHeight)
-        posterImageView.layoutParams = LayoutParams(targetWidth, targetHeight)
-        videoPlaceholder.layoutParams = LayoutParams(targetWidth, targetHeight)
-        thumbnailOverlay.layoutParams = LayoutParams(targetWidth, targetHeight)
+        updateCardSize(targetWidth, targetHeight)
         updateFocusOverlayVisibility(isFocused)
-    }
-
-    private fun stretchCard() {
-        lifecycleOwner.lifecycleScope.launch {
-            resizeCard(true)
-        }
-    }
-
-    fun shrinkCard() {
-        lifecycleOwner.lifecycleScope.launch {
-            Log.d(TAG, "Shrinking card")
-            resizeCard(false)
-        }
     }
 
     fun showThumbnail() {
@@ -270,25 +325,38 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun updateFocusOverlayVisibility(hasFocus: Boolean) {
-        Log.d(TAG, "updateFocusOverlay hasFocus $hasFocus  isVideoPlaying $isVideoPlaying")
+        Log.d(TAG, "updateFocusOverlay hasFocus $hasFocus isVideoPlaying $isVideoPlaying")
         val shouldBeVisible = hasFocus || isVideoPlaying
         lifecycleOwner.lifecycleScope.launch {
-            background = if (shouldBeVisible) ContextCompat.getDrawable(
-                context, R.drawable.itemview_background_focused
-            ) else ContextCompat.getDrawable(context, R.drawable.focus_onselect_bg)
-            Log.d(TAG, "updateFocusOverlay " + if (shouldBeVisible) View.VISIBLE else View.INVISIBLE)
+            background = if (shouldBeVisible)
+                ContextCompat.getDrawable(context, R.drawable.itemview_background_focused)
+            else
+                ContextCompat.getDrawable(context, R.drawable.focus_onselect_bg)
         }
     }
 
-    fun resetCardState() {
+    fun shrinkCard() {
+        lifecycleOwner.lifecycleScope.launch {
+            resizeCard(false)
+        }
+    }
+
+    fun resetCardState(skipAnimation: Boolean = false) {
         Log.d(TAG, "Resetting card state")
         isVideoPlaying = false
         isInAdSequence = false
+        hasVideoStarted = false
         videoPlaceholder.visibility = View.GONE
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailOverlay.visibility = View.GONE
-        shrinkCard()
+
+        if (skipAnimation) {
+            resizeCard(false)
+        } else {
+            animateCardSize(false)
+        }
+
         updateFocusOverlayVisibility(isFocused)
     }
 

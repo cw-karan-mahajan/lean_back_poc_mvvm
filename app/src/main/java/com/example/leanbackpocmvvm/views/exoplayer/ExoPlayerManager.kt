@@ -95,14 +95,14 @@ class ExoPlayerManager @Inject constructor(
         vastAd: VastParser.VastAd? = null
     ) {
         playerScope.launch {
-            if (exoPlayer == null || exoPlayer?.playbackState == Player.STATE_IDLE) {
-                reinitializePlayer()
-            }
-
             try {
                 while (isReleasing.get()) {
                     delay(100)
                 }
+
+                Log.d(TAG, "Starting video preparation - isPartOfSequence: $isPartOfSequence, URL: $videoUrl")
+                Log.d(TAG, "Current player state: ${exoPlayer?.playbackState}")
+                Log.d(TAG, "Is player null: ${exoPlayer == null}")
 
                 when {
                     isPlayingVideo.get() -> {
@@ -112,8 +112,12 @@ class ExoPlayerManager @Inject constructor(
                     }
                 }
 
-                setCurrentVastAd(vastAd)
-                val player = getOrCreatePlayer()
+                // Initialize player if needed
+                if (exoPlayer == null) {
+                    exoPlayer = createExoPlayer()
+                }
+
+                val player = exoPlayer!!
                 playerView.player = player
 
                 val upstreamFactory = DefaultDataSource.Factory(context)
@@ -123,6 +127,9 @@ class ExoPlayerManager @Inject constructor(
                 val source = ProgressiveMediaSource.Factory(cacheDataSourceFactory)
                     .createMediaSource(MediaItem.fromUri(videoUrl))
 
+                // Reset player state but don't release
+                player.stop()
+                player.clearMediaItems()
                 player.setMediaSource(source)
                 player.prepare()
 
@@ -133,11 +140,11 @@ class ExoPlayerManager @Inject constructor(
                     override fun onPlaybackStateChanged(state: Int) {
                         when (state) {
                             Player.STATE_READY -> {
+                                Log.d(TAG, "Player state changed to: $state")
                                 onReady(true)
                                 isPlayingVideo.set(true)
                                 hasVideoEnded.set(false)
                             }
-
                             Player.STATE_ENDED -> {
                                 if (!isPartOfSequence) {
                                     releasePlayer()
@@ -157,12 +164,10 @@ class ExoPlayerManager @Inject constructor(
                             PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> {
                                 player.prepare()
                             }
-
                             PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
                                 player.seekToDefaultPosition()
                                 player.prepare()
                             }
-
                             else -> {
                                 player.stop()
                                 player.clearMediaItems()
@@ -223,7 +228,6 @@ class ExoPlayerManager @Inject constructor(
                         val percentage = (position * 100.0) / duration
 
                         if (!trackedFirstQuartile && percentage >= 25) {
-                            Log.d(TAG, "Tracking first quartile for ad ${vastAd.id}")
                             vastTrackingManager.trackQuartile(
                                 vastAd,
                                 VastParser.VastAd.EVENT_FIRST_QUARTILE
@@ -231,7 +235,6 @@ class ExoPlayerManager @Inject constructor(
                             trackedFirstQuartile = true
                         }
                         if (!trackedMidpoint && percentage >= 50) {
-                            Log.d(TAG, "Tracking midpoint for ad ${vastAd.id}")
                             vastTrackingManager.trackQuartile(
                                 vastAd,
                                 VastParser.VastAd.EVENT_MIDPOINT
@@ -239,7 +242,6 @@ class ExoPlayerManager @Inject constructor(
                             trackedMidpoint = true
                         }
                         if (!trackedThirdQuartile && percentage >= 75) {
-                            Log.d(TAG, "Tracking third quartile for ad ${vastAd.id}")
                             vastTrackingManager.trackQuartile(
                                 vastAd,
                                 VastParser.VastAd.EVENT_THIRD_QUARTILE
@@ -310,17 +312,11 @@ class ExoPlayerManager @Inject constructor(
         return builder.build()
     }
 
-    fun setVideoSurface(surface: Surface) {
-        playerScope.launch {
-            exoPlayer?.setVideoSurface(surface)
-        }
-    }
-
     fun clearTrackedEvents(vastAdId: String) {
         trackedEvents.remove(vastAdId)
     }
 
-    fun clearAllTracking() {
+    private fun clearAllTracking() {
         trackedEvents.clear()
         currentVastAd = null
     }
