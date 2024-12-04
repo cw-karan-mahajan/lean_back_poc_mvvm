@@ -6,4 +6,7 @@
     <color name="selected_background">#ffaa3f</color>
     <color name="default_background">#3d3d3d</color>
     <color name="default_card_background">#000000</color>
+    <color name="transparent_black">#80000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="blue">#2196F3</color>
 </resources>

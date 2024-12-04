@@ -76,6 +76,10 @@ class VastAdSequenceManager @Inject constructor(
         totalAds = 0
     }
 
+    fun getCurrentAdIndex(): Int = currentIndex
+
+    fun getTotalAds(): Int = totalAds
+
     companion object {
         private const val TAG = "VastAdSequenceManager"
     }

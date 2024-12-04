@@ -197,7 +197,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         stopVideoPlayback()
         currentPlayingCard = cardView
 
-        // Important: Remove from previous parent first
         (sharedPlayerView.parent as? ViewGroup)?.removeView(sharedPlayerView)
 
         val isPartOfSequence = cardView.customItem?.rowItemX?.let {
@@ -205,13 +204,6 @@ class MainFragment : BrowseSupportFragment(), isConnected {
         } ?: false
 
         cardView.prepareForVideoPlayback(isPartOfSequence)
-
-        // Add these debug logs
-        Log.d(TAG, "Preparing video playback - tileId: $tileId, isSequence: $isPartOfSequence")
-        Log.d(TAG, "VideoPlaceholder visibility: ${cardView.videoPlaceholder.visibility}")
-
-        // Ensure proper view hierarchy
-        cardView.videoPlaceholder.removeAllViews()
         cardView.videoPlaceholder.addView(sharedPlayerView)
 
         // Get current VAST ad if available
@@ -219,24 +211,33 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             viewModel.vastAdSequenceManager.getCurrentAd()
         } else null
 
-        // Force layout pass before preparing player
-        cardView.videoPlaceholder.post {
-            exoPlayerManager.prepareVideo(
-                videoUrl = videoUrl,
-                playerView = sharedPlayerView,
-                onReady = { isReady ->
-                    if (isReady) {
-                        Log.d(TAG, "Video ready to play - tileId: $tileId")
-                        cardView.startVideoPlayback()
-                    }
-                },
-                onEnded = {
-                    viewModel.onVideoEnded(tileId)
-                },
-                isPartOfSequence = isPartOfSequence,
-                vastAd = currentVastAd
-            )
-        }
+        // Set progress callback
+        exoPlayerManager.setProgressCallback(object : ExoPlayerManager.ProgressCallback {
+            override fun onProgressUpdate(currentPosition: Long, duration: Long, adNumber: Int, totalAds: Int) {
+                cardView.updateAdProgress(currentPosition, duration, adNumber, totalAds)
+            }
+        })
+
+        exoPlayerManager.prepareVideo(
+            videoUrl = videoUrl,
+            playerView = sharedPlayerView,
+            onReady = { isReady ->
+                if (isReady) {
+                    cardView.startVideoPlayback(
+                        adNumber = viewModel.vastAdSequenceManager.getCurrentAdIndex() + 1,
+                        totalAdCount = viewModel.vastAdSequenceManager.getTotalAds(),
+                        duration = exoPlayerManager.getOrCreatePlayer().duration ?: 0
+                    )
+                }
+            },
+            onEnded = {
+                viewModel.onVideoEnded(tileId)
+            },
+            isPartOfSequence = isPartOfSequence,
+            vastAd = currentVastAd,
+            adNumber = viewModel.vastAdSequenceManager.getCurrentAdIndex() + 1,
+            totalAds = viewModel.vastAdSequenceManager.getTotalAds()
+        )
     }
 
     private fun setupEventListeners() {
@@ -447,8 +448,8 @@ class MainFragment : BrowseSupportFragment(), isConnected {
             val horizontalGridView = findHorizontalGridView(rowView)
 
             if (horizontalGridView != null) {
-                val rowAdapter = horizontalGridView.adapter
-                val rowItemCount = rowAdapter?.itemCount ?: 0
+                //val rowAdapter = horizontalGridView.adapter
+                //val rowItemCount = rowAdapter?.itemCount ?: 0
                 val rowVisibleItemCount = horizontalGridView.childCount
 
                 var rowFullyVisibleItemsCount = 0

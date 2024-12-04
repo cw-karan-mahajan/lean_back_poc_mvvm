@@ -1,3 +1,5 @@
+import java.util.Locale
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
@@ -23,9 +25,10 @@ android {
 
     buildTypes {
         debug {
+            enableUnitTestCoverage = true
             isDebuggable = true
             isMinifyEnabled = false
-            isTestCoverageEnabled = true
+            //enableAndroidTestCoverage = true
         }
         release {
             isMinifyEnabled = false
@@ -36,16 +39,27 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 
     buildFeatures {
         dataBinding = true
         viewBinding = true
+    }
+
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("src/main/java")
+            kotlin.srcDirs("src/main/java")
+        }
+        getByName("test") {
+            java.srcDirs("src/test/java")
+            kotlin.srcDirs("src/test/java")
+        }
     }
 
     testOptions {
@@ -124,23 +138,22 @@ dependencies {
     testImplementation("com.google.dagger:hilt-android-testing:2.50")
     kaptTest("com.google.dagger:hilt-android-compiler:2.50")
 
+    testImplementation("androidx.test:rules:1.5.0")
+    testImplementation("org.junit.vintage:junit-vintage-engine:5.8.2")
+
 }
 
 // In build.gradle.kts
 
 jacoco {
-    toolVersion = "0.8.7"
+    toolVersion = "0.8.11"
 }
 
 tasks.withType<Test> {
-    useJUnitPlatform()
-    testLogging {
-        events("passed", "skipped", "failed")
+    configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+        excludes = listOf("jdk.internal.*")
     }
-//    configure<JacocoTaskExtension> {
-//        isIncludeNoLocationClasses = true
-//        excludes = listOf("**/utils/GetAllAppsWorker*", "**/utils/ResourcesUtils*", "jdk.internal.*")
-//    }
     finalizedBy("jacocoTestReport")
 }
 
@@ -149,50 +162,32 @@ tasks.register<JacocoReport>("jacocoTestReport") {
 
     reports {
         xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/jacocoTestReport.xml"))
         html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/html"))
     }
 
-    // Match your Java project structure with both Java and Kotlin source sets
-    val debugTree = fileTree("${project.layout.buildDirectory}/intermediates/javac/debug") {
+    val debugTree = fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
         exclude(
             "**/R.class",
             "**/R$*.class",
             "**/BuildConfig.*",
             "**/Manifest*.*",
-            "**/*Test*.*",
-            "**/*Activity*.*",
-            "**/*Fragment*.*",
-            "**/*Layout*.*",
-            "**/utils/GetAllAppsWorker*",
-            "**/utils/ResourcesUtils*"
+            "**/*Test*.*"
         )
     }
 
-    val kotlinDebugTree = fileTree("${project.layout.buildDirectory}/tmp/kotlin-classes/debug") {
-        exclude(
-            "**/R.class",
-            "**/R$*.class",
-            "**/BuildConfig.*",
-            "**/Manifest*.*",
-            "**/*Test*.*",
-            "**/*Activity*.*",
-            "**/*Fragment*.*",
-            "**/*Layout*.*",
-            "**/utils/GetAllAppsWorker*",
-            "**/utils/ResourcesUtils*"
-        )
-    }
+    val mainSrc = "${project.projectDir}/src/main/java"
 
-    sourceDirectories.setFrom(files(
-        "${project.projectDir}/src/main/java",
-        "${project.projectDir}/src/main/kotlin"
+    sourceDirectories.setFrom(files(mainSrc))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(files(
+        layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"),
+        layout.buildDirectory.file("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
     ))
-    classDirectories.setFrom(files(debugTree, kotlinDebugTree))
-    executionData.setFrom(fileTree(project.layout.buildDirectory) {
-        include(
-            "jacoco/testDebugUnitTest.exec",
-            "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
-        )
-    })
 }
+
+
+
+
 

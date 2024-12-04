@@ -116,6 +116,7 @@ class MainViewModel @Inject constructor(
                 _uiState.value = UiState.Success(myData2)
             } catch (e: Exception) {
                 _toastMessage.value = "Error loading data: ${e.message}"
+                _uiState.value = UiState.Error(e.message ?: "Unknown error")
             }
         }
     }

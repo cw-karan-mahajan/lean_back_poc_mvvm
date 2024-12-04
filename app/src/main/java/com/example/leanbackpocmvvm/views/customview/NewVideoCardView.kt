@@ -3,11 +3,14 @@ package com.example.leanbackpocmvvm.views.customview
 import android.animation.ValueAnimator
 import android.content.Context
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.core.animation.doOnEnd
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
@@ -18,6 +21,9 @@ import com.example.leanbackpocmvvm.application.GlideApp
 import com.example.leanbackpocmvvm.utils.dpToPx
 import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @UnstableApi
@@ -39,9 +45,19 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     var customItem: CustomRowItemX? = null
     private var isInAdSequence = false
     private var currentAnimator: ValueAnimator? = null
+    private var isPreparingNextInSequence = false
+
+    // Progress tracking components
+    private var progressOverlay: View
+    private var progressBar: ProgressBar
+    private var adCounterText: TextView
+    private var durationText: TextView
+    private var progressUpdateJob: Job? = null
+    private var currentAdDuration: Long = 0
+    private var currentAdNumber: Int = 0
+    private var totalAds: Int = 0
 
     private val ANIMATION_DURATION = 300L
-    private var isPreparingNextInSequence = false
 
     init {
         layoutParams = ViewGroup.LayoutParams(
@@ -105,6 +121,14 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         }
         addView(thumbnailOverlay)
 
+        // Initialize progress overlay
+        progressOverlay = LayoutInflater.from(context).inflate(R.layout.progress_overlay, this, false)
+        progressBar = progressOverlay.findViewById(R.id.adProgress)
+        adCounterText = progressOverlay.findViewById(R.id.adCounterText)
+        durationText = progressOverlay.findViewById(R.id.durationText)
+        progressOverlay.visibility = View.GONE
+        addView(progressOverlay)
+
         setOnFocusChangeListener { _, hasFocus ->
             Log.d(
                 TAG,
@@ -112,7 +136,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             )
             updateFocusOverlayVisibility(hasFocus)
 
-            // Handle manual focus changes without animation
             if (!hasVideoStarted) {
                 resizeCard(false)
             }
@@ -130,6 +153,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         isViewAttached = false
         currentAnimator?.cancel()
         currentAnimator = null
+        progressUpdateJob?.cancel()
         (context as? MainActivity)?.safelyUseGlide {
             GlideApp.with(context).clear(thumbnailImageView)
             GlideApp.with(context).clear(posterImageView)
@@ -189,16 +213,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
     }
 
     private fun animateCardSize(stretch: Boolean, onComplete: (() -> Unit)? = null) {
-        if (!hasVideoStarted && stretch) {
-            // Don't animate if video hasn't started yet
-            updateCardSize(
-                if (stretch) stretchedWidth else originalWidth,
-                if (stretch) stretchedHeight else originalHeight
-            )
-            onComplete?.invoke()
-            return
-        }
-
         val startWidth = width
         val startHeight = height
         val targetWidth = if (stretch) stretchedWidth else originalWidth
@@ -238,6 +252,54 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         posterImageView.layoutParams = LayoutParams(width, height)
         videoPlaceholder.layoutParams = LayoutParams(width, height)
         thumbnailOverlay.layoutParams = LayoutParams(width, height)
+        progressOverlay.layoutParams = LayoutParams(width, LayoutParams.WRAP_CONTENT).apply {
+            gravity = android.view.Gravity.BOTTOM
+        }
+    }
+
+    fun updateAdProgress(currentPosition: Long, duration: Long, adNumber: Int, totalAdCount: Int) {
+        currentAdDuration = duration
+        currentAdNumber = adNumber
+        totalAds = totalAdCount
+
+        progressOverlay.visibility = View.VISIBLE
+
+        // Convert to seconds and ensure logical progress
+        val durationSeconds = (duration / 1000).toInt()
+        val currentSeconds = (currentPosition / 1000).toInt()
+        progressBar.max = durationSeconds
+        progressBar.progress = currentSeconds
+
+        val remainingSeconds = (durationSeconds - currentSeconds).coerceAtLeast(0)
+        val minutes = remainingSeconds / 60
+        val seconds = remainingSeconds % 60
+
+        adCounterText.text = "Ad $adNumber of $totalAdCount"
+        durationText.text = " (${minutes}:${String.format("%02d", seconds)})"
+    }
+
+    private fun startProgressTracking(duration: Long) {
+        progressUpdateJob?.cancel()
+        progressUpdateJob = lifecycleOwner.lifecycleScope.launch {
+            try {
+                val durationSeconds = (duration / 1000).toInt()
+                progressBar.max = durationSeconds
+                var elapsedSeconds = 0
+
+                while (isActive && elapsedSeconds <= durationSeconds) {
+                    val remainingSeconds = (durationSeconds - elapsedSeconds).coerceAtLeast(0)
+                    val minutes = remainingSeconds / 60
+                    val seconds = remainingSeconds % 60
+                    progressBar.progress = elapsedSeconds
+                    durationText.text = " (${minutes}:${String.format("%02d", seconds)})"
+
+                    delay(1000)
+                    elapsedSeconds++
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in progress tracking: ${e.message}")
+            }
+        }
     }
 
     fun prepareForVideoPlayback(isPartOfSequence: Boolean = false) {
@@ -249,7 +311,6 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         thumbnailImageView.visibility = View.GONE
         posterImageView.visibility = View.GONE
 
-        // Only show overlay for first ad or non-sequence videos
         if (!isPreparingNextInSequence) {
             setupThumbnailOverlay()
         }
@@ -270,12 +331,20 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         thumbnailOverlay.visibility = View.VISIBLE
     }
 
-    fun startVideoPlayback() {
+    fun startVideoPlayback(adNumber: Int = 1, totalAdCount: Int = 1, duration: Long = 0) {
         Log.d(TAG, "Starting video playback")
         isVideoPlaying = true
         hasVideoStarted = true
+        updateFocusOverlayVisibility(true)
 
-        // Don't animate if we're transitioning between sequence ads
+        if (duration > 0) {
+            progressOverlay.visibility = View.VISIBLE
+            adCounterText.text = "Ad $adNumber of $totalAdCount"
+            progressBar.max = duration.toInt()
+            progressBar.progress = 0
+            startProgressTracking(duration)
+        }
+
         if (!isPreparingNextInSequence) {
             animateCardSize(true) {
                 thumbnailOverlay.animate()
@@ -288,12 +357,9 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
                     .start()
             }
         } else {
-            // Just update size without animation for sequence transition
             updateCardSize(stretchedWidth, stretchedHeight)
             thumbnailOverlay.visibility = View.GONE
         }
-
-        updateFocusOverlayVisibility(true)
     }
 
     fun endVideoPlayback(shouldResetState: Boolean) {
@@ -301,6 +367,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
             isPreparingNextInSequence = true
             videoPlaceholder.visibility = View.VISIBLE
         } else if (shouldResetState) {
+            progressUpdateJob?.cancel()
+            progressOverlay.visibility = View.GONE
             isVideoPlaying = false
             hasVideoStarted = false
             isPreparingNextInSequence = false
@@ -322,6 +390,7 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailOverlay.visibility = View.GONE
+        progressOverlay.visibility = View.GONE
     }
 
     private fun updateFocusOverlayVisibility(hasFocus: Boolean) {
@@ -350,6 +419,8 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         posterImageView.visibility = View.GONE
         thumbnailImageView.visibility = View.VISIBLE
         thumbnailOverlay.visibility = View.GONE
+        progressOverlay.visibility = View.GONE
+        progressUpdateJob?.cancel()
 
         if (skipAnimation) {
             resizeCard(false)
@@ -358,6 +429,10 @@ class NewVideoCardView(context: Context) : FrameLayout(context) {
         }
 
         updateFocusOverlayVisibility(isFocused)
+    }
+
+    fun updateProgressVisibility(visible: Boolean) {
+        progressOverlay.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
     companion object {
