@@ -2,11 +2,13 @@ package com.example.leanbackpocmvvm.vastdata.parser
 
 import android.util.Log
 import android.util.LruCache
+import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import java.io.IOException
 import java.io.InputStream
 import java.net.URL
 import javax.inject.Inject
@@ -14,8 +16,6 @@ import javax.inject.Singleton
 
 @Singleton
 class VastParser @Inject constructor() {
-
-    // Cache for VAST responses with timestamp
     private val vastCache = LruCache<String, CacheEntry>(20)
 
     private data class CacheEntry(
@@ -95,60 +95,45 @@ class VastParser @Inject constructor() {
         }
     }
 
-    suspend fun parseVastUrl(vastUrl: String, tileId: String): Result<List<VastAd>> = withContext(Dispatchers.IO) {
-        try {
-            Log.d(TAG, "Starting to fetch VAST data for tileId: $tileId from URL: $vastUrl")
-
-            // Always fetch fresh data
-            withTimeout(TIMEOUT_MS) {
-                val connection = URL(vastUrl).openConnection().apply {
-                    connectTimeout = 5000
-                    readTimeout = 5000
-                    useCaches = false
-                    setRequestProperty("Cache-Control", "no-cache")
-                    setRequestProperty("Pragma", "no-cache")
+    @VisibleForTesting
+    internal fun parseVastXmlTest(inputStream: InputStream): Result<List<VastAd>> {
+        return try {
+            Log.d(TAG, "Starting test XML parsing")
+            val factory = runCatching {
+                XmlPullParserFactory.newInstance().apply {
+                    isNamespaceAware = false
                 }
+            }.getOrElse { e ->
+                Log.e(TAG, "Error creating XmlPullParserFactory: ${e.message}")
+                return Result.failure(e)
+            }
 
-                connection.getInputStream().use { stream ->
-                    val xmlContent = stream.bufferedReader().use { it.readText() }
-                    Log.d(TAG, "Received XML content length: ${xmlContent.length}")
-
-                    val xmlInputStream = xmlContent.byteInputStream()
-                    val result = parseVastXml(xmlInputStream)
-
-                    result.onSuccess { vastAds ->
-                        // Cache the successful result
-                        vastCache.put(tileId, CacheEntry(vastAds))
-                        Log.d(TAG, "Successfully parsed and cached ${vastAds.size} VAST ads for tileId: $tileId")
-                    }.onFailure { error ->
-                        Log.e(TAG, "Failed to parse VAST XML: ${error.message}")
+            try {
+                val parser = factory.newPullParser().apply {
+                    try {
+                        setInput(inputStream, null)
+                    } catch (e: IOException) {
+                        Log.e(TAG, "IOException during parsing: ${e.message}")
+                        return Result.failure(e)
                     }
-                    result
                 }
+                parseVastXml(parser)
+            } catch (e: IOException) {
+                Log.e(TAG, "IOException during parsing: ${e.message}")
+                Result.failure(e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in XML parsing: ${e.message}")
+                Result.failure(e)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error in parseVastUrl: ${e.message}")
-            e.printStackTrace()
-
-            // On error, try to return cached data if available
-            vastCache[tileId]?.let { cachedEntry ->
-                Log.d(TAG, "Returning cached data for tileId: $tileId")
-                return@withContext Result.success(cachedEntry.vastAds)
-            }
-
+            Log.e(TAG, "Error in test setup: ${e.message}")
             Result.failure(e)
         }
     }
 
-    private fun parseVastXml(inputStream: InputStream): Result<List<VastAd>> {
+    private fun parseVastXml(parser: XmlPullParser): Result<List<VastAd>> {
         return try {
             Log.d(TAG, "Starting XML parsing")
-            val factory = XmlPullParserFactory.newInstance().apply {
-                isNamespaceAware = false
-            }
-            val parser = factory.newPullParser()
-            parser.setInput(inputStream, null)
-
             val vastAds = mutableListOf<VastAd>()
             var currentAd: AdBuilder? = null
 
@@ -195,9 +180,8 @@ class VastParser @Inject constructor() {
                             }
                             "MediaFile" -> {
                                 if (currentAd != null) {
-                                    val mediaFile = parseMediaFile(parser)
-                                    if (mediaFile != null) {
-                                        currentAd.mediaFiles.add(mediaFile)
+                                    parseMediaFile(parser)?.let { mediaFile ->
+                                        currentAd?.mediaFiles?.add(mediaFile)
                                         Log.d(TAG, "Added MediaFile: $mediaFile")
                                     }
                                 }
@@ -248,9 +232,60 @@ class VastParser @Inject constructor() {
 
             Log.d(TAG, "Completed XML parsing. Total Ads parsed: ${vastAds.size}")
             Result.success(vastAds.sortedBy { it.sequence })
+
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing VAST XML: ${e.message}")
             e.printStackTrace()
+            Result.failure(e)
+        }
+    }
+
+    suspend fun parseVastUrl(vastUrl: String, tileId: String): Result<List<VastAd>> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Starting to fetch VAST data for tileId: $tileId from URL: $vastUrl")
+
+            // Always fetch fresh data
+            withTimeout(TIMEOUT_MS) {
+                val connection = URL(vastUrl).openConnection().apply {
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                    useCaches = false
+                    setRequestProperty("Cache-Control", "no-cache")
+                    setRequestProperty("Pragma", "no-cache")
+                }
+
+                connection.getInputStream().use { stream ->
+                    val xmlContent = stream.bufferedReader().use { it.readText() }
+                    Log.d(TAG, "Received XML content length: ${xmlContent.length}")
+
+                    val factory = XmlPullParserFactory.newInstance().apply {
+                        isNamespaceAware = false
+                    }
+                    val parser = factory.newPullParser().apply {
+                        setInput(xmlContent.byteInputStream(), null)
+                    }
+
+                    val result = parseVastXml(parser)
+
+                    result.onSuccess { vastAds ->
+                        vastCache.put(tileId, CacheEntry(vastAds))
+                        Log.d(TAG, "Successfully parsed and cached ${vastAds.size} VAST ads for tileId: $tileId")
+                    }.onFailure { error ->
+                        Log.e(TAG, "Failed to parse VAST XML: ${error.message}")
+                    }
+                    result
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in parseVastUrl: ${e.message}")
+            e.printStackTrace()
+
+            // On error, try to return cached data if available
+            vastCache[tileId]?.let { cachedEntry ->
+                Log.d(TAG, "Returning cached data for tileId: $tileId")
+                return@withContext Result.success(cachedEntry.vastAds)
+            }
+
             Result.failure(e)
         }
     }
@@ -278,7 +313,7 @@ class VastParser @Inject constructor() {
     }
 
     private fun parseMediaFile(parser: XmlPullParser): MediaFile? {
-        return try {
+        try {
             val attributes = mutableMapOf<String, String>()
             for (i in 0 until parser.attributeCount) {
                 attributes[parser.getAttributeName(i)] = parser.getAttributeValue(i)
@@ -286,7 +321,7 @@ class VastParser @Inject constructor() {
 
             val url = extractTextContent(parser)
             if (url.isNotEmpty()) {
-                MediaFile(
+                return MediaFile(
                     url = url,
                     bitrate = attributes["bitrate"]?.toIntOrNull() ?: 0,
                     width = attributes["width"]?.toIntOrNull() ?: 0,
@@ -303,14 +338,11 @@ class VastParser @Inject constructor() {
                         Delivery: ${it.delivery}
                     """.trimIndent())
                 }
-            } else {
-                Log.w(TAG, "Empty MediaFile URL")
-                null
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing MediaFile: ${e.message}")
-            null
         }
+        return null
     }
 
     private fun parseExtensionContent(parser: XmlPullParser, type: String, extensions: MutableMap<String, String>) {
@@ -351,12 +383,12 @@ class VastParser @Inject constructor() {
             ------- MediaFiles (${vastAd.mediaFiles.size}) -------
             ${vastAd.mediaFiles.joinToString("\n") { mediaFile ->
             """
-                MediaFile:
-                - URL: ${mediaFile.url}
-                - Bitrate: ${mediaFile.bitrate}
-                - Resolution: ${mediaFile.width}x${mediaFile.height}
-                - Type: ${mediaFile.type}
-                - Delivery: ${mediaFile.delivery}
+                    MediaFile:
+                    - URL: ${mediaFile.url}
+                    - Bitrate: ${mediaFile.bitrate}
+                    - Resolution: ${mediaFile.width}x${mediaFile.height}
+                    - Type: ${mediaFile.type}
+                    - Delivery: ${mediaFile.delivery}
                 """.trimIndent()
         }}
             

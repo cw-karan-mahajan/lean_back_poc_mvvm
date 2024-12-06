@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="3.0">
+    <Ad id="1122706-1-n" sequence="1">
+        <InLine>
+            <AdSystem>SpringServe</AdSystem>
+            <AdTitle>4929348</AdTitle>
+            <Impression id="SpringServe_Impression_1">
+                <![CDATA[https://vid-io-sin.springserve.com/vd/i?event=vast_impression]]>
+            </Impression>
+            <Creatives>
+                <Creative id="596121">
+                    <Linear>
+                        <Duration>00:00:15</Duration>
+                        <TrackingEvents>
+                            <Tracking event="start">
+                                <![CDATA[https://vid-io-sin.springserve.com/vd/i?event=js_start]]>
+                            </Tracking>
+                            <Tracking event="firstQuartile">
+                                <![CDATA[https://vid-io-sin.springserve.com/vd/i?event=js_first_quartile]]>
+                            </Tracking>
+                            <Tracking event="midpoint">
+                                <![CDATA[https://vid-io-sin.springserve.com/vd/i?event=js_midpoint]]>
+                            </Tracking>
+                            <Tracking event="thirdQuartile">
+                                <![CDATA[https://vid-io-sin.springserve.com/vd/i?event=js_third_quartile]]>
+                            </Tracking>
+                            <Tracking event="complete">
+                                <![CDATA[https://vid-io-sin.springserve.com/vd/i?event=js_complete]]>
+                            </Tracking>
+                        </TrackingEvents>
+                        <VideoClicks>
+                            <ClickThrough><![CDATA[https://www.example.com]]></ClickThrough>
+                            <ClickTracking><![CDATA[https://vid-io-sin.springserve.com/vd/i?event=js_click]]></ClickTracking>
+                        </VideoClicks>
+                        <MediaFiles>
+                            <MediaFile bitrate="91" delivery="progressive" height="240" type="video/mp4" width="426">
+                                <![CDATA[https://assets.springserve.com/video1.mp4]]>
+                            </MediaFile>
+                            <MediaFile bitrate="193" delivery="progressive" height="360" type="video/mp4" width="640">
+                                <![CDATA[https://assets.springserve.com/video2.mp4]]>
+                            </MediaFile>
+                        </MediaFiles>
+                    </Linear>
+                </Creative>
+            </Creatives>
+        </InLine>
+    </Ad>
+    <!-- Add second and third ads similarly -->
+</VAST>

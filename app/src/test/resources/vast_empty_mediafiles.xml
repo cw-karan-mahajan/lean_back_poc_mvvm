@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="3.0">
+    <Ad id="test_ad">
+        <InLine>
+            <AdSystem>Test System</AdSystem>
+            <AdTitle>Test Ad</AdTitle>
+            <Creatives>
+                <Creative>
+                    <Linear>
+                        <Duration>00:00:30</Duration>
+                        <MediaFiles/>
+                    </Linear>
+                </Creative>
+            </Creatives>
+        </InLine>
+    </Ad>
+</VAST>

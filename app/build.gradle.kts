@@ -60,6 +60,11 @@ android {
             java.srcDirs("src/test/java")
             kotlin.srcDirs("src/test/java")
         }
+        getByName("test") {
+            resources {
+                srcDir("src/test/resources")
+            }
+        }
     }
 
     testOptions {
@@ -141,6 +146,9 @@ dependencies {
     testImplementation("androidx.test:rules:1.5.0")
     testImplementation("org.junit.vintage:junit-vintage-engine:5.8.2")
 
+    testImplementation("xmlpull:xmlpull:1.1.3.1")
+    testImplementation("net.sf.kxml:kxml2:2.3.0")
+
 }
 
 // In build.gradle.kts
@@ -181,10 +189,12 @@ tasks.register<JacocoReport>("jacocoTestReport") {
 
     sourceDirectories.setFrom(files(mainSrc))
     classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(files(
-        layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"),
-        layout.buildDirectory.file("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
-    ))
+    executionData.setFrom(
+        files(
+            layout.buildDirectory.file("jacoco/testDebugUnitTest.exec"),
+            layout.buildDirectory.file("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
+        )
+    )
 }
 
 
