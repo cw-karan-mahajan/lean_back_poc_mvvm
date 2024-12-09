@@ -1,8 +1,6 @@
 package com.example.leanbackpocmvvm.remote
 
-import com.example.leanbackpocmvvm.models.AdResponse
 import com.example.leanbackpocmvvm.models.MyData2
-import com.google.gson.JsonObject
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.GET
@@ -12,7 +10,7 @@ import retrofit2.http.Url
 
 interface ApiService {
 
-    @GET("cats/")
+    @GET("cats")
     suspend fun fetchList(): Response<MyData2?>
 }
 

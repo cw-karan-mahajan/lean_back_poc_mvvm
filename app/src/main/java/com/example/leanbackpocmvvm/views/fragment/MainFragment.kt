@@ -585,7 +585,7 @@ class MainFragment : BrowseSupportFragment(), isConnected {
 
     override fun connected() {
         viewModel.setNetworkStatus(true)
-        viewModel.loadData()
+        viewModel.fetchData()
     }
 
     override fun notconnected() {
