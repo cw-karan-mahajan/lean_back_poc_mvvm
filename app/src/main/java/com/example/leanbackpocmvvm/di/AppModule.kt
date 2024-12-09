@@ -11,6 +11,7 @@ import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.impl.AdRepositoryImpl
 import com.example.leanbackpocmvvm.utils.Network
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
+import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
 import com.google.gson.Gson
@@ -118,9 +119,10 @@ object AppModule {
     fun provideAdRepository(
         dynamicApiServiceFactory: DynamicApiServiceFactory,
         networkConnectivity: NetworkConnectivity,
-        gson: Gson
+        gson: Gson,
+        vastAdSequenceManager: VastAdSequenceManager
     ): AdRepository {
-        return AdRepositoryImpl(dynamicApiServiceFactory, networkConnectivity, gson)
+        return AdRepositoryImpl(dynamicApiServiceFactory, networkConnectivity, gson, vastAdSequenceManager)
     }
 
     @UnstableApi

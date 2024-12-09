@@ -8,6 +8,7 @@ import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.utils.NetworkConnectivity
 import com.example.leanbackpocmvvm.utils.getResponse
+import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,7 +24,8 @@ import javax.inject.Singleton
 class AdRepositoryImpl @Inject constructor(
     private val dynamicApiServiceFactory: DynamicApiServiceFactory,
     private val networkConnectivity: NetworkConnectivity,
-    private val gson: Gson
+    private val gson: Gson,
+    private val vastAdSequenceManager: VastAdSequenceManager
 ) : AdRepository {
 
     private val maxConcurrentCalls = 20
@@ -63,6 +65,12 @@ class AdRepositoryImpl @Inject constructor(
                         try {
                             // First try direct JSON parsing
                             val adResponse = gson.fromJson(rawString, AdResponse::class.java)
+                            val adid = adResponse.seatbid?.firstOrNull()?.bid?.firstOrNull()?.adid
+                            Log.d(TAG, "Extracted ADID: $adid for URL: $url")
+                            adid?.let { id ->
+                                Log.d(TAG, "Storing ADID in VastAdSequenceManager")
+                                vastAdSequenceManager.storeAdId(id)
+                            }
                             val parsedResponse = parseAdResponse(adResponse, url)
                             url to Resource.success(parsedResponse)
                         } catch (e: Exception) {
