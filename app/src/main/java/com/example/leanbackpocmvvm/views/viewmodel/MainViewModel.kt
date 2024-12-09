@@ -100,6 +100,7 @@ class MainViewModel @Inject constructor(
         adPreparationJob = SupervisorJob()
     }
 
+    // fetching from assets folder data2.json
     fun loadData() {
         viewModelScope.launch {
             try {
@@ -576,32 +577,6 @@ class MainViewModel @Inject constructor(
             } catch (e: Exception) {
                 Log.e(TAG, "Error tracking impressions: ${e.message}", e)
                 _pendingImpressions.addAll(impressions)
-            }
-        }
-    }
-
-    // Video preloading
-    fun preloadVideo(item: CustomRowItemX) {
-        if (item.rowItemX.tileType == "typeAdsVideoBanner" && !item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
-            viewModelScope.launch {
-                vastRepository.preloadVastAd(item.rowItemX.adsVideoUrl ?: "", item.rowItemX.tid)
-                    .collect { resource ->
-                        when (resource) {
-                            is Resource.Success -> {
-                                Log.d(TAG, "Successfully preloaded VAST ad for tileId: ${item.rowItemX.tid}")
-                            }
-                            is Resource.Error -> {
-                                Log.e(TAG, "Error preloading VAST ad: ${resource.message}")
-                            }
-                            is Resource.Loading -> {
-                                Log.d(TAG, "Preloading VAST ad...")
-                            }
-                        }
-                    }
-            }
-        } else {
-            item.rowItemX.videoUrl?.let { videoUrl ->
-                _preloadVideoCommand.value = PreloadVideoCommand(videoUrl)
             }
         }
     }

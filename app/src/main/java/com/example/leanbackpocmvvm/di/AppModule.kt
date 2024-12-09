@@ -119,10 +119,9 @@ object AppModule {
     fun provideAdRepository(
         dynamicApiServiceFactory: DynamicApiServiceFactory,
         networkConnectivity: NetworkConnectivity,
-        gson: Gson,
-        vastAdSequenceManager: VastAdSequenceManager
+        gson: Gson
     ): AdRepository {
-        return AdRepositoryImpl(dynamicApiServiceFactory, networkConnectivity, gson, vastAdSequenceManager)
+        return AdRepositoryImpl(dynamicApiServiceFactory, networkConnectivity, gson)
     }
 
     @UnstableApi

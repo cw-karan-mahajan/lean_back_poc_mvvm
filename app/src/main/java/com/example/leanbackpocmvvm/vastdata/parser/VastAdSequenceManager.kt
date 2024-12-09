@@ -3,7 +3,6 @@ package com.example.leanbackpocmvvm.vastdata.parser
 import android.util.Log
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.vastdata.validator.VastMediaSelector
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,36 +15,14 @@ class VastAdSequenceManager @Inject constructor(
     private var currentSequence = mutableListOf<VastParser.VastAd>()
     private var currentIndex = 0
     private var totalAds = 0
-    private var storedAdId: String? = null
-
-    fun storeAdId(adid: String) {
-        Log.d(TAG, "Storing ADID: $adid")
-        storedAdId = adid
-    }
 
     suspend fun prepareAdSequence(vastUrl: String, tileId: String): Boolean {
         currentSequence.clear()
         currentIndex = 0
         totalAds = 0
 
-        val finalUrl = if (storedAdId != null && vastUrl.contains("[ADID]")) {
-            val url = vastUrl.replace("[ADID]", storedAdId!!)
-            Log.d(TAG, "Modified URL with ADID: $url")
-            url
-        } else {
-            Log.d(TAG, "Using original URL")
-            vastUrl
-        }
-
-        val isAdId = storedAdId != null && vastUrl.contains("[ADID]")
-        Log.d(TAG, "contains URL: $isAdId $storedAdId")
-
-
-
-        Log.d(TAG, "Final VAST URL: $finalUrl")
-
         try {
-            vastParser.parseVastUrl(finalUrl, tileId)
+            vastParser.parseVastUrl(vastUrl, tileId)
                 .fold(
                     onSuccess = { vastAds ->
                         currentSequence.addAll(vastAds
