@@ -100,7 +100,7 @@ class MainViewModel @Inject constructor(
         adPreparationJob = SupervisorJob()
     }
 
-    // fetching from assets folder data2.json
+    // fetching from assets folder and file data2.json
     fun loadData() {
         viewModelScope.launch {
             try {
@@ -206,9 +206,35 @@ class MainViewModel @Inject constructor(
                 Log.d(TAG, "Starting VAST ad processing for tileId: ${item.rowItemX.tid}")
                 Log.d(TAG, "VAST URL: ${item.rowItemX.adsVideoUrl}")
 
-                // Prepare ad sequence during 10-second preview
+                // First handle ads_server to get adid if present
+                if (!item.rowItemX.adsServer.isNullOrEmpty()) {
+                    adRepository.fetchAds(listOf(item.rowItemX.adsServer)).firstOrNull()?.let { result ->
+                        when (result.second) {
+                            is Resource.Success -> {
+                                val adResponse = (result.second as Resource.Success<AdResponse>).data
+                                adResponse.seatbid?.firstOrNull()?.bid?.firstOrNull()?.adid?.let { adid ->
+                                    adRepository.storeAdId(item.rowItemX.tid, adid)
+                                }
+                            }
+                            is Resource.Error -> {
+                                Log.e(TAG, "Error fetching ad: ${(result.second as Resource.Error).message}")
+                            }
+
+                            else -> {}
+                        }
+                    }
+                }
+
+                // Process adsVideoUrl with stored adid if needed
+                val processedUrl = if (!item.rowItemX.adsVideoUrl.isNullOrEmpty()) {
+                    adRepository.processVideoUrl(item.rowItemX.tid, item.rowItemX.adsVideoUrl ?: "")
+                } else {
+                    item.rowItemX.adsVideoUrl
+                }
+
+                // Prepare ad sequence with processed URL
                 val success = vastAdSequenceManager.prepareAdSequence(
-                    item.rowItemX.adsVideoUrl ?: "",
+                    processedUrl ?: "",
                     item.rowItemX.tid
                 )
 
