@@ -15,16 +15,12 @@ import com.example.leanbackpocmvvm.vastdata.handler.VastErrorHandler
 import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.vastdata.validator.VastMediaSelector
-import com.example.leanbackpocmvvm.vastdata.validator.VastXmlValidator
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
-import java.io.IOException
-import java.net.ConnectException
-import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -123,11 +119,11 @@ object VastModule {
         return VastErrorHandler()
     }
 
-    @Provides
+    /*@Provides
     @Singleton
     fun provideVastXmlValidator(): VastXmlValidator {
         return VastXmlValidator()  // No parameters needed
-    }
+    }*/
 
     @Provides
     @Singleton

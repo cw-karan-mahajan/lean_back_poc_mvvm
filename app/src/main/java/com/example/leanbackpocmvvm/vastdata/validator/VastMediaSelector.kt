@@ -138,12 +138,6 @@ class VastMediaSelector @Inject constructor(
         }
     }
 
-    /*fun isMediaSupported(mediaFile: VastParser.MediaFile): Boolean {
-        return mediaFile.type in preferredMimeTypes &&
-                areDimensionsSuitable(mediaFile.width, mediaFile.height) &&
-                mediaFile.bitrate <= maxBitrate
-    }*/
-
     companion object {
         private const val TAG = "VastMediaSelector"
     }

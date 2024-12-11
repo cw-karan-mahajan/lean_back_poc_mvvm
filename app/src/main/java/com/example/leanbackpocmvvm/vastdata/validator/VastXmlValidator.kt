@@ -1,11 +1,12 @@
 package com.example.leanbackpocmvvm.vastdata.validator
 
-import android.util.Log
+/*import android.util.Log
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
+
 
 @Singleton
 class VastXmlValidator @Inject constructor() {
@@ -173,4 +174,4 @@ class VastXmlValidator @Inject constructor() {
     companion object {
         private const val TAG = "VastXmlValidator"
     }
-}
+}*/
