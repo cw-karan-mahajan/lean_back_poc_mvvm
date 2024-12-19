@@ -82,9 +82,7 @@ class VastTrackingManager @Inject constructor(
         }
     }
 
-    private suspend fun retryWithBackoff(
-        block: suspend () -> Unit
-    ) {
+    private suspend fun retryWithBackoff(block: suspend () -> Unit) {
         var currentDelay = retryDelayMs
         repeat(maxRetryAttempts) { attempt ->
             try {

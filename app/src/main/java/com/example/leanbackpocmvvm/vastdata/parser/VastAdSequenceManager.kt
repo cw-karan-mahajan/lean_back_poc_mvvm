@@ -3,7 +3,6 @@ package com.example.leanbackpocmvvm.vastdata.parser
 import android.util.Log
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.vastdata.validator.VastMediaSelector
-import com.example.leanbackpocmvvm.views.fragment.MainFragment
 import javax.inject.Inject
 import javax.inject.Singleton
 
