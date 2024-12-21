@@ -1,6 +1,5 @@
 package com.example.leanbackpocmvvm.repository.impl
 
-import android.util.Log
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.*
 import com.example.leanbackpocmvvm.remote.AdApiService
@@ -13,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -63,7 +63,7 @@ class AdRepositoryImpl @Inject constructor(
 
                         // Store adid from response
                         adResponse.seatbid?.firstOrNull()?.bid?.firstOrNull()?.adid?.let { adid ->
-                            Log.d(TAG, "Extracted adid: $adid")
+                            Timber.d(TAG, "Extracted adid: $adid")
                         }
 
                         val parsedResponse = parseAdResponse(adResponse, url)
@@ -71,13 +71,13 @@ class AdRepositoryImpl @Inject constructor(
                     }
                     return url to Resource.error("Empty response body")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error parsing response: ${e.message}")
+                    Timber.e(TAG, "Error parsing response: ${e.message}")
                     return url to Resource.error("Error parsing response: ${e.message}")
                 }
             }
             return url to Resource.error("Error fetching ad: ${response.code()}")
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching ad: ${e.message}", e)
+            Timber.e(TAG, "Error fetching ad: ${e.message}", e)
             return url to Resource.error("Something went wrong: ${e.message}")
         }
     }
@@ -86,7 +86,7 @@ class AdRepositoryImpl @Inject constructor(
         val updatedSeatbid = adResponse.seatbid?.map { seatbid ->
             val updatedBids = seatbid.bid?.map { bid ->
                 try {
-                    Log.d(TAG, "Original adm content: ${bid.adm}")
+                    Timber.d(TAG, "Original adm content: ${bid.adm}")
 
                     // Remove any surrounding quotes and unescape the JSON string
                     val cleanAdm = bid.adm.trim().let { adm ->
@@ -100,15 +100,15 @@ class AdRepositoryImpl @Inject constructor(
                     val imageUrl = nativeAdWrapper.native?.assets?.firstOrNull()?.img?.url
                     val impTrackerUrls = nativeAdWrapper.native?.imptrackers ?: emptyList()
 
-                    Log.d(TAG, "Parsed Image URL: $imageUrl")
+                    Timber.d(TAG, "Parsed Image URL: $imageUrl")
 
                     if (impTrackerUrls.isNotEmpty()) {
                         impressionUrls[url] = impTrackerUrls
                     }
                     bid.copy(parsedImageUrl = imageUrl)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error parsing bid JSON: ${e.message}", e)
-                    Log.e(TAG, "Failed adm content: ${bid.adm}")
+                    Timber.e(TAG, "Error parsing bid JSON: ${e.message}", e)
+                    Timber.e(TAG, "Failed adm content: ${bid.adm}")
                     e.printStackTrace()
                     bid
                 }
@@ -143,7 +143,7 @@ class AdRepositoryImpl @Inject constructor(
                 Resource.error("Error tracking impression: ${response.code()}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error tracking impression: ${e.message}", e)
+            Timber.e(TAG, "Error tracking impression: ${e.message}", e)
             Resource.error("Something went wrong: ${e.message}")
         }
     }
@@ -154,13 +154,13 @@ class AdRepositoryImpl @Inject constructor(
 
    override fun processVideoUrl(tileId: String, adsVideoUrl: String): String {
         return adIdMap[tileId]?.let { adid ->
-            Log.d(TAG, "Processing URL for tileId: $tileId with adid: $adid")
+            Timber.d(TAG, "Processing URL for tileId: $tileId with adid: $adid")
             adsVideoUrl.replace("[ADID]", adid)
         } ?: adsVideoUrl
     }
 
     override fun storeAdId(tileId: String, adid: String) {
         adIdMap[tileId] = adid
-        Log.d(TAG, "Stored adid: $adid for tileId: $tileId")
+        Timber.d(TAG, "Stored adid: $adid for tileId: $tileId")
     }
 }

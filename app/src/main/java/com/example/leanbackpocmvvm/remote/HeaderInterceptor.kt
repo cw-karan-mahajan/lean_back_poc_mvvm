@@ -1,9 +1,8 @@
 package com.example.leanbackpocmvvm.remote
 
-import android.util.Log
 import okhttp3.Interceptor
-import okhttp3.OkHttpClient
 import okhttp3.Response
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,7 +11,7 @@ class HeaderInterceptor @Inject constructor() : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val deviceInfo = getDeviceInfo()
-        Log.d("Headers", "" + deviceInfo)
+        Timber.d("Headers", "" + deviceInfo)
 
 
         val modifiedRequest = originalRequest.newBuilder()

@@ -1,20 +1,20 @@
 package com.example.leanbackpocmvvm.repository.impl
 
 import android.content.Context
-import android.util.Log
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.remote.VastApiService
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.repository.VastRepository
 import com.example.leanbackpocmvvm.vastdata.tracking.AdEventTracker
-import com.example.leanbackpocmvvm.utils.NetworkConnectivity
+import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.IOException
+import timber.log.Timber
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
@@ -43,7 +43,7 @@ class VastRepositoryImpl @Inject constructor(
         try {
             send(Resource.loading())
 
-            Log.d(TAG, "Fetching VAST XML from URL: $vastUrl")
+            Timber.d(TAG, "Fetching VAST XML from URL: $vastUrl")
             val vastApiService = dynamicApiServiceFactory.createService(VastApiService::class.java, vastUrl)
             val path = dynamicApiServiceFactory.extractPath(vastUrl)
             val queryParams = dynamicApiServiceFactory.extractQueryParams(vastUrl)
@@ -60,15 +60,15 @@ class VastRepositoryImpl @Inject constructor(
                 return@channelFlow
             }
 
-            Log.d(TAG, "Successfully received VAST XML, now parsing...")
+            Timber.d(TAG, "Successfully received VAST XML, now parsing...")
 
             vastParser.parseVastUrl(vastUrl, tileId)
                 .fold(
                     onSuccess = { vastAds ->
                         if (vastAds.isNotEmpty()) {
-                            Log.d(TAG, "Successfully parsed ${vastAds.size} VAST ads")
+                            Timber.d(TAG, "Successfully parsed ${vastAds.size} VAST ads")
                             vastAds.forEachIndexed { index, vastAd ->
-                                Log.d(TAG, "Processing Ad ${index + 1} of ${vastAds.size}")
+                                Timber.d(TAG, "Processing Ad ${index + 1} of ${vastAds.size}")
                                 logVastAdDetails(vastAd)
                             }
                             send(Resource.success(vastAds))
@@ -117,7 +117,7 @@ class VastRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             send(Resource.error<Boolean>("Error tracking event: ${e.message}"))
-            Log.e(TAG, "Error tracking event", e)
+            Timber.e(TAG, "Error tracking event", e)
         }
     }.flowOn(Dispatchers.IO)
         .retryWhen { cause, attempt ->
@@ -166,7 +166,7 @@ class VastRepositoryImpl @Inject constructor(
                 )
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error preloading VAST for tileId: $tileId", e)
+            Timber.e(TAG, "Error preloading VAST for tileId: $tileId", e)
             send(Resource.error("Error preloading VAST: ${e.message}"))
         }
     }.flowOn(Dispatchers.IO)
@@ -181,28 +181,28 @@ class VastRepositoryImpl @Inject constructor(
             withContext(Dispatchers.IO) {
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        Log.w(TAG, "Failed to preload media: ${response.code}")
+                        Timber.w(TAG, "Failed to preload media: ${response.code}")
                     } else {
-                        Log.d(TAG, "Successfully preloaded media: $url")
+                        Timber.d(TAG, "Successfully preloaded media: $url")
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error preloading media", e)
+            Timber.e(TAG, "Error preloading media", e)
         }
     }
 
     private fun logVastAdDetails(vastAd: VastParser.VastAd) {
-        Log.d(TAG, "========== VAST Ad Details ==========")
-        Log.d(TAG, "Ad ID: ${vastAd.id}")
-        Log.d(TAG, "Sequence: ${vastAd.sequence}")
-        Log.d(TAG, "Ad System: ${vastAd.adSystem}")
-        Log.d(TAG, "Ad Title: ${vastAd.adTitle}")
-        Log.d(TAG, "Duration: ${vastAd.duration}")
+        Timber.d(TAG, "========== VAST Ad Details ==========")
+        Timber.d(TAG, "Ad ID: ${vastAd.id}")
+        Timber.d(TAG, "Sequence: ${vastAd.sequence}")
+        Timber.d(TAG, "Ad System: ${vastAd.adSystem}")
+        Timber.d(TAG, "Ad Title: ${vastAd.adTitle}")
+        Timber.d(TAG, "Duration: ${vastAd.duration}")
 
-        Log.d(TAG, "------- MediaFiles (${vastAd.mediaFiles.size}) -------")
+        Timber.d(TAG, "------- MediaFiles (${vastAd.mediaFiles.size}) -------")
         vastAd.mediaFiles.forEach { mediaFile ->
-            Log.d(TAG, """
+            Timber.d(TAG, """
                 MediaFile:
                 - URL: ${mediaFile.url}
                 - Bitrate: ${mediaFile.bitrate}
@@ -212,22 +212,22 @@ class VastRepositoryImpl @Inject constructor(
             """.trimIndent())
         }
 
-        Log.d(TAG, "------- Tracking Events -------")
+        Timber.d(TAG, "------- Tracking Events -------")
         vastAd.trackingEvents.forEach { (event, url) ->
-            Log.d(TAG, "Event: $event -> URL: $url")
+            Timber.d(TAG, "Event: $event -> URL: $url")
         }
 
-        Log.d(TAG, "------- Click Information -------")
-        Log.d(TAG, "ClickThrough: ${vastAd.clickThrough}")
-        Log.d(TAG, "ClickTracking: ${vastAd.clickTracking}")
+        Timber.d(TAG, "------- Click Information -------")
+        Timber.d(TAG, "ClickThrough: ${vastAd.clickThrough}")
+        Timber.d(TAG, "ClickTracking: ${vastAd.clickTracking}")
 
         if (vastAd.extensions.isNotEmpty()) {
-            Log.d(TAG, "------- Extensions -------")
+            Timber.d(TAG, "------- Extensions -------")
             vastAd.extensions.forEach { (key, value) ->
-                Log.d(TAG, "$key: $value")
+                Timber.d(TAG, "$key: $value")
             }
         }
-        Log.d(TAG, "===================================")
+        Timber.d(TAG, "===================================")
     }
 
     override fun clearVastCache() {

@@ -1,12 +1,12 @@
 package com.example.leanbackpocmvvm.repository
 
 import android.content.Context
-import android.util.Log
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,7 +24,7 @@ class MainRepository @Inject constructor(
         val inputStream = context.assets.open("data2.json")
         val json: String = inputStream.bufferedReader().use { it.readText() }
         inputStream.close()
-        Log.d("MainRepository", "JSON read: ${json.take(800)}...") // Log first 600 chars
+        Timber.d("MainRepository", "JSON read: ${json.take(800)}...") // Log first 600 chars
         return gson.fromJson(json, MyData2::class.java)
     }
 }

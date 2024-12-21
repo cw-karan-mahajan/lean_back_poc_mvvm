@@ -11,7 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class VastErrorHandler @Inject constructor() {  // Remove parameters from primary constructor
 
-    private val maxErrorTimberSize: Int = 100  // Move as property
+    private val maxerrorLogSize: Int = 100  // Move as property
     private val shouldRetryOnError: (Throwable) -> Boolean = { error ->  // Move as property
         when (error) {
             is IOException,
@@ -20,7 +20,7 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
             else -> false
         }
     }
-    private val errorTimber = ConcurrentLinkedQueue<ErrorEntry>()
+    private val errorLog = ConcurrentLinkedQueue<ErrorEntry>()
 
     data class ErrorEntry(
         val error: Throwable,
@@ -42,11 +42,11 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
         operation: String? = null
     ) {
         val entry = ErrorEntry(error, System.currentTimeMillis(), vastId, operation)
-        errorTimber.offer(entry)
+        errorLog.offer(entry)
 
         // Trim Timber if it exceeds max size
-        while (errorTimber.size > maxErrorTimberSize) {
-            errorTimber.poll()
+        while (errorLog.size > maxerrorLogSize) {
+            errorLog.poll()
         }
 
         Timber.e(TAG, "VAST Error - ID: $vastId, Operation: $operation", error)
@@ -57,7 +57,7 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
     }
 
     fun getErrorStats(): ErrorStats {
-        return errorTimber.toList().let { errors ->
+        return errorLog.toList().let { errors ->
             ErrorStats(
                 totalErrors = errors.size,
                 retryableErrors = errors.count { shouldRetryOnError(it.error) },
@@ -68,20 +68,20 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
     }
 
     fun getErrorsForVastId(vastId: String): List<ErrorEntry> {
-        return errorTimber.filter { it.vastId == vastId }
+        return errorLog.filter { it.vastId == vastId }
     }
 
-    fun clearErrorTimber() {
-        errorTimber.clear()
+    fun clearErrorLog() {
+        errorLog.clear()
     }
 
     fun clearErrorsForVastId(vastId: String) {
-        errorTimber.removeIf { it.vastId == vastId }
+        errorLog.removeIf { it.vastId == vastId }
     }
 
     fun clearErrorsOlderThan(timeMs: Long) {
         val cutoffTime = System.currentTimeMillis() - timeMs
-        errorTimber.removeIf { it.timestamp < cutoffTime }
+        errorLog.removeIf { it.timestamp < cutoffTime }
     }
 
     companion object {
