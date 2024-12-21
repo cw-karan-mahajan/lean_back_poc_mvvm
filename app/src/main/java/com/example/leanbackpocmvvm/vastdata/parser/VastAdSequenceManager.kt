@@ -1,8 +1,8 @@
 package com.example.leanbackpocmvvm.vastdata.parser
 
-import android.util.Log
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.vastdata.validator.VastMediaSelector
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,7 +20,7 @@ class VastAdSequenceManager @Inject constructor(
         currentSequence.clear()
         currentIndex = 0
         totalAds = 0
-        Log.d(TAG, "tileId $tileId vastUrl $vastUrl")
+        Timber.d(TAG, "tileId $tileId vastUrl $vastUrl")
         try {
             vastParser.parseVastUrl(vastUrl, tileId)
                 .fold(
@@ -32,14 +32,14 @@ class VastAdSequenceManager @Inject constructor(
                         totalAds = currentSequence.size
                     },
                     onFailure = { error ->
-                        Log.e(TAG, "Error preparing ad sequence: ${error.message}")
+                        Timber.e(TAG, "Error preparing ad sequence: ${error.message}")
                         return false
                     }
                 )
 
             return currentSequence.isNotEmpty()
         } catch (e: Exception) {
-            Log.e(TAG, "Error preparing ad sequence: ${e.message}")
+            Timber.e(TAG, "Error preparing ad sequence: ${e.message}")
             return false
         }
     }

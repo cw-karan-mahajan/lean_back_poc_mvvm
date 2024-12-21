@@ -25,7 +25,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.leanbackpocmvvm.R
@@ -34,7 +33,7 @@ import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
 import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
-import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import com.example.leanbackpocmvvm.views.viewmodel.AutoScrollCommand
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX

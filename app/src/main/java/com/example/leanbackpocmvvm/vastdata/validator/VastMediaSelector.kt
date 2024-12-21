@@ -2,12 +2,12 @@ package com.example.leanbackpocmvvm.vastdata.validator
 
 import android.content.Context
 import android.util.DisplayMetrics
-import android.util.Log
 import android.view.WindowManager
 import com.example.leanbackpocmvvm.utils.getBandwidthBasedMaxBitrate
 import com.example.leanbackpocmvvm.utils.getSupportedCodecs
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import dagger.hilt.android.qualifiers.ApplicationContext
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -52,18 +52,18 @@ class VastMediaSelector @Inject constructor(
             }
 
             if (selections.isEmpty()) {
-                Log.w(TAG, "No suitable media files found for VAST ad ${vastAd.id}")
+                Timber.w(TAG, "No suitable media files found for VAST ad ${vastAd.id}")
                 return vastAd.mediaFiles.firstOrNull()
             }
 
             val bestSelection = selections.maxByOrNull { it.score }
             bestSelection?.let {
-                Log.d(TAG, "Selected media file: ${it.reason}")
+                Timber.d(TAG, "Selected media file: ${it.reason}")
             }
 
             return bestSelection?.mediaFile
         } catch (e: Exception) {
-            Log.e(TAG, "Error selecting media file: ${e.message}")
+            Timber.e(TAG, "Error selecting media file: ${e.message}")
             return vastAd.mediaFiles.firstOrNull()
         }
     }

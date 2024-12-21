@@ -3,7 +3,7 @@ package com.example.leanbackpocmvvm.repository.impl
 import android.content.Context
 import android.util.Log
 import com.example.leanbackpocmvvm.core.Resource
-import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
+import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.remote.VastApiService
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.repository.VastRepository

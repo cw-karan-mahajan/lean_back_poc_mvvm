@@ -3,6 +3,7 @@ package com.example.leanbackpocmvvm.utils
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkInfo
+import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
 import javax.inject.Inject
 
 
@@ -19,7 +20,3 @@ class Network @Inject constructor(val context: Context) : NetworkConnectivity {
     }
 }
 
-interface NetworkConnectivity {
-    fun getNetworkInfo(): NetworkInfo?
-    fun isConnected(): Boolean
-}

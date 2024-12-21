@@ -1,6 +1,5 @@
 package com.example.leanbackpocmvvm.vastdata.parser
 
-import android.util.Log
 import android.util.LruCache
 import androidx.annotation.VisibleForTesting
 import kotlinx.coroutines.Dispatchers
@@ -8,6 +7,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import timber.log.Timber
 import java.io.IOException
 import java.io.InputStream
 import java.net.URL
@@ -28,7 +28,7 @@ class VastParser @Inject constructor() {
 
         override fun entryRemoved(evicted: Boolean, key: String, oldValue: CacheEntry, newValue: CacheEntry?) {
             super.entryRemoved(evicted, key, oldValue, newValue)
-            Log.d(TAG, "Cache entry removed - key: $key, evicted: $evicted")
+            Timber.d(TAG, "Cache entry removed - key: $key, evicted: $evicted")
         }
     }
 
@@ -112,13 +112,13 @@ class VastParser @Inject constructor() {
     @VisibleForTesting
     internal fun parseVastXmlTest(inputStream: InputStream): Result<List<VastAd>> {
         return try {
-            Log.d(TAG, "Starting test XML parsing")
+            Timber.d(TAG, "Starting test XML parsing")
             val factory = runCatching {
                 XmlPullParserFactory.newInstance().apply {
                     isNamespaceAware = false
                 }
             }.getOrElse { e ->
-                Log.e(TAG, "Error creating XmlPullParserFactory: ${e.message}")
+                Timber.e(TAG, "Error creating XmlPullParserFactory: ${e.message}")
                 return Result.failure(e)
             }
 
@@ -127,27 +127,27 @@ class VastParser @Inject constructor() {
                     try {
                         setInput(inputStream, null)
                     } catch (e: IOException) {
-                        Log.e(TAG, "IOException during parsing: ${e.message}")
+                        Timber.e(TAG, "IOException during parsing: ${e.message}")
                         return Result.failure(e)
                     }
                 }
                 parseVastXml(parser)
             } catch (e: IOException) {
-                Log.e(TAG, "IOException during parsing: ${e.message}")
+                Timber.e(TAG, "IOException during parsing: ${e.message}")
                 Result.failure(e)
             } catch (e: Exception) {
-                Log.e(TAG, "Error in XML parsing: ${e.message}")
+                Timber.e(TAG, "Error in XML parsing: ${e.message}")
                 Result.failure(e)
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error in test setup: ${e.message}")
+            Timber.e(TAG, "Error in test setup: ${e.message}")
             Result.failure(e)
         }
     }
 
     private fun parseVastXml(parser: XmlPullParser): Result<List<VastAd>> {
         return try {
-            Log.d(TAG, "Starting XML parsing")
+            Timber.d(TAG, "Starting XML parsing")
             val vastAds = mutableListOf<VastAd>()
             var currentAd: AdBuilder? = null
             var vastVersion: String? = null
@@ -159,7 +159,7 @@ class VastParser @Inject constructor() {
                         when (parser.name) {
                             "VAST" -> {
                                 vastVersion = parser.getAttributeValue(null, "version")
-                                Log.d(TAG, "Found VAST tag with version: $vastVersion")
+                                Timber.d(TAG, "Found VAST tag with version: $vastVersion")
                             }
 
                             "Ad" -> {
@@ -170,7 +170,7 @@ class VastParser @Inject constructor() {
                                             ?: 0
                                     version = vastVersion
                                 }
-                                Log.d(
+                                Timber.d(
                                     TAG,
                                     "Started parsing Ad ID: ${currentAd.id}, Sequence: ${currentAd.sequence}"
                                 )
@@ -179,38 +179,38 @@ class VastParser @Inject constructor() {
                             "AdSystem" -> {
                                 val adSystem = extractTextContent(parser)
                                 currentAd?.adSystem = adSystem
-                                Log.d(TAG, "Parsed AdSystem: $adSystem")
+                                Timber.d(TAG, "Parsed AdSystem: $adSystem")
                             }
 
                             "AdTitle" -> {
                                 val adTitle = extractTextContent(parser)
                                 currentAd?.adTitle = adTitle
-                                Log.d(TAG, "Parsed AdTitle: $adTitle")
+                                Timber.d(TAG, "Parsed AdTitle: $adTitle")
                             }
 
                             "Impression" -> {
                                 val impression = extractTextContent(parser)
                                 currentAd?.impression = impression
-                                Log.d(TAG, "Parsed Impression: $impression")
+                                Timber.d(TAG, "Parsed Impression: $impression")
                             }
 
                             "Creative" -> {
                                 val creativeId = parser.getAttributeValue(null, "id")
                                 currentAd?.creativeId = creativeId ?: ""
-                                Log.d(TAG, "Parsed Creative ID: $creativeId")
+                                Timber.d(TAG, "Parsed Creative ID: $creativeId")
                             }
 
                             "Duration" -> {
                                 val duration = extractTextContent(parser)
                                 currentAd?.duration = duration
-                                Log.d(TAG, "Parsed Duration: $duration")
+                                Timber.d(TAG, "Parsed Duration: $duration")
                             }
 
                             "MediaFile" -> {
                                 if (currentAd != null) {
                                     parseMediaFile(parser)?.let { mediaFile ->
                                         currentAd?.mediaFiles?.add(mediaFile)
-                                        Log.d(TAG, "Added MediaFile: $mediaFile")
+                                        Timber.d(TAG, "Added MediaFile: $mediaFile")
                                     }
                                 }
                             }
@@ -220,7 +220,7 @@ class VastParser @Inject constructor() {
                                 val url = extractTextContent(parser)
                                 if (event != null && url.isNotEmpty()) {
                                     currentAd?.trackingEvents?.put(event, url)
-                                    Log.d(TAG, "Added Tracking - Event: $event, URL: $url")
+                                    Timber.d(TAG, "Added Tracking - Event: $event, URL: $url")
                                 }
                             }
 
@@ -228,7 +228,7 @@ class VastParser @Inject constructor() {
                                 val clickThrough = extractTextContent(parser)
                                 if (clickThrough.isNotEmpty()) {
                                     currentAd?.clickThrough = clickThrough
-                                    Log.d(TAG, "Added ClickThrough: $clickThrough")
+                                    Timber.d(TAG, "Added ClickThrough: $clickThrough")
                                 }
                             }
 
@@ -236,7 +236,7 @@ class VastParser @Inject constructor() {
                                 val clickTracking = extractTextContent(parser)
                                 if (clickTracking.isNotEmpty()) {
                                     currentAd?.clickTracking = clickTracking
-                                    Log.d(TAG, "Added ClickTracking: $clickTracking")
+                                    Timber.d(TAG, "Added ClickTracking: $clickTracking")
                                 }
                             }
 
@@ -253,8 +253,8 @@ class VastParser @Inject constructor() {
                         if (parser.name == "Ad") {
                             currentAd?.build()?.let { ad ->
                                 vastAds.add(ad)
-                                Log.d(TAG, "Completed parsing Ad: ${ad.id}")
-                                logVastAdDetails(ad)
+                                Timber.d(TAG, "Completed parsing Ad: ${ad.id}")
+                                TimberVastAdDetails(ad)
                             }
                             currentAd = null
                         }
@@ -263,11 +263,11 @@ class VastParser @Inject constructor() {
                 eventType = parser.next()
             }
 
-            Log.d(TAG, "Completed XML parsing. Total Ads parsed: ${vastAds.size}")
+            Timber.d(TAG, "Completed XML parsing. Total Ads parsed: ${vastAds.size}")
             Result.success(vastAds.sortedBy { it.sequence })
 
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing VAST XML: ${e.message}")
+            Timber.e(TAG, "Error parsing VAST XML: ${e.message}")
             e.printStackTrace()
             Result.failure(e)
         }
@@ -276,7 +276,7 @@ class VastParser @Inject constructor() {
     suspend fun parseVastUrl(vastUrl: String, tileId: String): Result<List<VastAd>> =
         withContext(Dispatchers.IO) {
             try {
-                Log.d(TAG, "Starting to fetch VAST data for tileId: $tileId from URL: $vastUrl")
+                Timber.d(TAG, "Starting to fetch VAST data for tileId: $tileId from URL: $vastUrl")
 
                 // Always fetch fresh data
                 withTimeout(TIMEOUT_MS) {
@@ -290,7 +290,7 @@ class VastParser @Inject constructor() {
 
                     connection.getInputStream().use { stream ->
                         val xmlContent = stream.bufferedReader().use { it.readText() }
-                        Log.d(TAG, "Received XML content length: ${xmlContent.length}")
+                        Timber.d(TAG, "Received XML content length: ${xmlContent.length}")
 
                         val factory = XmlPullParserFactory.newInstance().apply {
                             isNamespaceAware = false
@@ -303,23 +303,23 @@ class VastParser @Inject constructor() {
 
                         result.onSuccess { vastAds ->
                             vastCache.put(tileId, CacheEntry(vastAds))
-                            Log.d(
+                            Timber.d(
                                 TAG,
                                 "Successfully parsed and cached ${vastAds.size} VAST ads for tileId: $tileId"
                             )
                         }.onFailure { error ->
-                            Log.e(TAG, "Failed to parse VAST XML: ${error.message}")
+                            Timber.e(TAG, "Failed to parse VAST XML: ${error.message}")
                         }
                         result
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error in parseVastUrl: ${e.message}")
+                Timber.e(TAG, "Error in parseVastUrl: ${e.message}")
                 e.printStackTrace()
 
                 // On error, try to return cached data if available
                 vastCache[tileId]?.let { cachedEntry ->
-                    Log.d(TAG, "Returning cached data for tileId: $tileId")
+                    Timber.d(TAG, "Returning cached data for tileId: $tileId")
                     return@withContext Result.success(cachedEntry.vastAds)
                 }
 
@@ -344,7 +344,7 @@ class VastParser @Inject constructor() {
                 event = parser.next()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error extracting text content: ${e.message}")
+            Timber.e(TAG, "Error extracting text content: ${e.message}")
         }
         return content
     }
@@ -370,7 +370,7 @@ class VastParser @Inject constructor() {
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing MediaFile: ${e.message}")
+            Timber.e(TAG, "Error parsing MediaFile: ${e.message}")
         }
         return null
     }
@@ -392,7 +392,7 @@ class VastParser @Inject constructor() {
                             val value = extractTextContent(parser)
                             if (value.isNotEmpty()) {
                                 extensions["${type}_${currentTag}"] = value
-                                Log.d(TAG, "Added extension: ${type}_${currentTag} = $value")
+                                Timber.d(TAG, "Added extension: ${type}_${currentTag} = $value")
                             }
                         }
                     }
@@ -400,11 +400,11 @@ class VastParser @Inject constructor() {
                 eventType = parser.next()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing Extension: ${e.message}")
+            Timber.e(TAG, "Error parsing Extension: ${e.message}")
         }
     }
 
-    private fun logVastAdDetails(vastAd: VastAd) {
+    private fun TimberVastAdDetails(vastAd: VastAd) {
     }
 
     fun addToCache(tileId: String, vastAds: List<VastAd>): Boolean {

@@ -4,9 +4,9 @@ import android.util.Log
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.*
 import com.example.leanbackpocmvvm.remote.AdApiService
-import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
+import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.repository.AdRepository
-import com.example.leanbackpocmvvm.utils.NetworkConnectivity
+import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

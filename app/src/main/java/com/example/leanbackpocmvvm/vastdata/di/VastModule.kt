@@ -1,48 +1,81 @@
-package com.example.leanbackpocmvvm.di
+package com.example.leanbackpocmvvm.vastdata.di
 
 import android.content.Context
-import com.example.leanbackpocmvvm.remote.DynamicApiServiceFactory
+import androidx.media3.common.util.UnstableApi
+import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
-import com.example.leanbackpocmvvm.repository.VastRepository
-import com.example.leanbackpocmvvm.repository.impl.VastRepositoryImpl
 import com.example.leanbackpocmvvm.vastdata.tracking.AdEventTracker
-import com.example.leanbackpocmvvm.utils.NetworkConnectivity
 import com.example.leanbackpocmvvm.utils.getBandwidthBasedMaxBitrate
 import com.example.leanbackpocmvvm.utils.getSupportedCodecs
 import com.example.leanbackpocmvvm.utils.isAndroidVersion9Supported
 import com.example.leanbackpocmvvm.vastdata.cache.SimpleVastCache
-import com.example.leanbackpocmvvm.vastdata.handler.VastErrorHandler
+import com.example.leanbackpocmvvm.vastdata.validator.VastErrorHandler
+import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
 import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import com.example.leanbackpocmvvm.vastdata.validator.VastMediaSelector
+import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 object VastModule {
-
     @Provides
     @Singleton
-    fun provideVastParser(): VastParser {
-        return VastParser()
+    fun provideGson(): Gson {
+        return GsonBuilder().setLenient().disableHtmlEscaping().serializeNulls().create()
     }
 
     @Provides
     @Singleton
     fun provideVastHttpClient(): OkHttpClient {
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
         return OkHttpClient.Builder()
+            .hostnameVerifier { _, _ -> true }
+            .addInterceptor(loggingInterceptor)
+            .addInterceptor { chain ->
+                val original = chain.request()
+                val requestBuilder = original.newBuilder()
+                    .header("Accept-Encoding", "identity")
+                    .header("Accept", "application/json")
+                chain.proceed(requestBuilder.build())
+            }
             .connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(5, TimeUnit.SECONDS)
             .writeTimeout(5, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDynamicApiServiceFactory(): DynamicApiServiceFactory {
+        val retrofitBuilder = Retrofit.Builder()
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(provideGson()))
+
+        return DynamicApiServiceFactory(retrofitBuilder, provideVastHttpClient().newBuilder())
+    }
+
+    @Provides
+    @Singleton
+    fun provideVastParser(): VastParser {
+        return VastParser()
     }
 
     @Provides
@@ -56,26 +89,6 @@ object VastModule {
             networkConnectivity = networkConnectivity,
             retryAttempts = 3,
             retryDelayMs = 1000L
-        )
-    }
-
-    @Provides
-    @Singleton
-    fun provideVastRepository(
-        vastParser: VastParser,
-        @ApplicationContext context: Context,
-        networkConnectivity: NetworkConnectivity,
-        okHttpClient: OkHttpClient,
-        adEventTracker: AdEventTracker,
-        dynamicApiServiceFactory: DynamicApiServiceFactory
-    ): VastRepository {
-        return VastRepositoryImpl(
-            vastParser = vastParser,
-            context = context,
-            networkConnectivity = networkConnectivity,
-            httpClient = okHttpClient,
-            adEventTracker = adEventTracker,
-            dynamicApiServiceFactory = dynamicApiServiceFactory
         )
     }
 
@@ -119,12 +132,6 @@ object VastModule {
         return VastErrorHandler()
     }
 
-    /*@Provides
-    @Singleton
-    fun provideVastXmlValidator(): VastXmlValidator {
-        return VastXmlValidator()  // No parameters needed
-    }*/
-
     @Provides
     @Singleton
     fun provideVastMediaSelector(
@@ -154,5 +161,15 @@ object VastModule {
             vastMediaSelector = vastMediaSelector,
             vastTrackingManager = vastTrackingManager
         )
+    }
+
+    @UnstableApi
+    @Provides
+    @Singleton
+    fun provideExoPlayerManager(
+        @ApplicationContext context: Context,
+        vastTrackingManager: VastTrackingManager
+    ): ExoPlayerManager {
+        return ExoPlayerManager(context, vastTrackingManager)
     }
 }

@@ -1,9 +1,9 @@
-package com.example.leanbackpocmvvm.remote
+package com.example.leanbackpocmvvm.vastdata.network
 
 import android.net.Uri
-import android.util.Log
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
+import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,7 +19,7 @@ class DynamicApiServiceFactory @Inject constructor(
         val cacheKey = "$baseUrl:${headers.hashCode()}"
 
         val retrofit = cachedRetrofits.getOrPut(cacheKey) {
-            Log.d("DynamicApiService", "Creating new Retrofit instance for base URL: $baseUrl")
+            Timber.d("DynamicApiService", "Creating new Retrofit instance for base URL: $baseUrl")
             val clientBuilder = okHttpClientBuilder
             if (headers.isNotEmpty()) {
                 clientBuilder.addInterceptor { chain ->
@@ -38,7 +38,7 @@ class DynamicApiServiceFactory @Inject constructor(
                     .client(client)
                     .build()
             } catch (e: IllegalArgumentException) {
-                Log.e("DynamicApiService", "Error creating Retrofit instance: ${e.message}", e)
+                Timber.e("DynamicApiService", "Error creating Retrofit instance: ${e.message}", e)
                 throw e
             }
         }

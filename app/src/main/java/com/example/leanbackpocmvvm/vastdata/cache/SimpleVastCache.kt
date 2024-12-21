@@ -1,9 +1,9 @@
 package com.example.leanbackpocmvvm.vastdata.cache
 
 import android.content.Context
-import android.util.Log
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.google.gson.Gson
+import timber.log.Timber
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -47,7 +47,7 @@ class SimpleVastCache @Inject constructor(
             // Check cache size and cleanup if needed
             enforceMaxCacheSize()
         } catch (e: Exception) {
-            Log.e(TAG, "Error caching VAST ad: ${e.message}")
+            Timber.e(TAG, "Error caching VAST ad: ${e.message}")
         }
     }
 
@@ -72,7 +72,7 @@ class SimpleVastCache @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error retrieving VAST ad from cache: ${e.message}")
+            Timber.e(TAG, "Error retrieving VAST ad from cache: ${e.message}")
         }
         return null
     }

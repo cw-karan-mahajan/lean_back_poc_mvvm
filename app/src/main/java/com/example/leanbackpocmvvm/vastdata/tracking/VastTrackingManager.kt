@@ -1,9 +1,9 @@
 package com.example.leanbackpocmvvm.vastdata.tracking
 
-import android.util.Log
 import com.example.leanbackpocmvvm.vastdata.cache.SimpleVastCache
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import kotlinx.coroutines.*
+import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Semaphore
 import javax.inject.Inject
@@ -37,15 +37,15 @@ class VastTrackingManager @Inject constructor(
                         retryWithBackoff {
                             adEventTracker.trackEvent(url, eventType, vastAd.id)
                         }
-                        //Log.d(TAG, "Successfully tracked event: ${eventType}_${vastAd.id}")
+                        //Timber.d(TAG, "Successfully tracked event: ${eventType}_${vastAd.id}")
                     } catch (e: CancellationException) {
-                        Log.d(TAG, "Tracking cancelled for event: ${eventType}_${vastAd.id}")
+                        Timber.d(TAG, "Tracking cancelled for event: ${eventType}_${vastAd.id}")
                         if (eventType == VastParser.VastAd.EVENT_COMPLETE) {
                             completedEvents.remove(vastAd.id)
                         }
                         throw e
                     } catch (e: Exception) {
-                        Log.e(TAG, "Failed to track event: ${eventType}_${vastAd.id}", e)
+                        Timber.e(TAG, "Failed to track event: ${eventType}_${vastAd.id}", e)
                         if (eventType == VastParser.VastAd.EVENT_COMPLETE) {
                             completedEvents.remove(vastAd.id)
                         }
@@ -55,7 +55,7 @@ class VastTrackingManager @Inject constructor(
             } catch (e: CancellationException) {
                 // Ignore cancellation
             } catch (e: Exception) {
-                Log.e(TAG, "Error tracking event $eventType for ad ${vastAd.id}: ${e.message}")
+                Timber.e(TAG, "Error tracking event $eventType for ad ${vastAd.id}: ${e.message}")
             } finally {
                 trackingSemaphore.release()
                 activeTracking.remove(trackingKey)
@@ -77,7 +77,7 @@ class VastTrackingManager @Inject constructor(
                 delay(100)
                 vastCache.clear()
             } catch (e: Exception) {
-                Log.e(TAG, "Error completing tracking for ad ${vastAd.id}: ${e.message}")
+                Timber.e(TAG, "Error completing tracking for ad ${vastAd.id}: ${e.message}")
             }
         }
     }
@@ -91,7 +91,7 @@ class VastTrackingManager @Inject constructor(
             } catch (e: CancellationException) {
                 throw e  // Don't retry on cancellation
             } catch (e: Exception) {
-                Log.e(TAG, "Attempt ${attempt + 1}/$maxRetryAttempts failed: ${e.message}")
+                Timber.e(TAG, "Attempt ${attempt + 1}/$maxRetryAttempts failed: ${e.message}")
                 if (attempt < maxRetryAttempts - 1) {
                     delay(currentDelay)
                     currentDelay *= 2 // Exponential backoff
@@ -107,7 +107,7 @@ class VastTrackingManager @Inject constructor(
         activeTracking.entries.removeIf { (key, job) ->
             if (key.contains(vastAdId)) {
                 job.cancel(CancellationException("Tracking cancelled for ad: $vastAdId"))
-                Log.d(TAG, "Cancelled tracking for ad: $vastAdId")
+                Timber.d(TAG, "Cancelled tracking for ad: $vastAdId")
                 true
             } else false
         }
@@ -119,13 +119,13 @@ class VastTrackingManager @Inject constructor(
                 completedEvents.clear()
                 activeTracking.forEach { (key, job) ->
                     job.cancel(CancellationException("All tracking cancelled"))
-                    Log.d(TAG, "Cancelled tracking for: $key")
+                    Timber.d(TAG, "Cancelled tracking for: $key")
                 }
                 activeTracking.clear()
                 // Clear cache when cancelling all tracking
                 vastCache.clear()
             } catch (e: Exception) {
-                Log.e(TAG, "Error cancelling all tracking: ${e.message}")
+                Timber.e(TAG, "Error cancelling all tracking: ${e.message}")
             }
         }
     }

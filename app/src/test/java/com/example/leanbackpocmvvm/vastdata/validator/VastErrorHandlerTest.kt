@@ -1,4 +1,4 @@
-package com.example.leanbackpocmvvm.vastdata.handler
+package com.example.leanbackpocmvvm.vastdata.validator
 
 import org.junit.Before
 import org.junit.Test

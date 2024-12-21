@@ -120,6 +120,7 @@ dependencies {
     val media3_version = "1.4.1"
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
+    implementation ("com.jakewharton.timber:timber:5.0.1")
 
     // Testing Dependencies
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")

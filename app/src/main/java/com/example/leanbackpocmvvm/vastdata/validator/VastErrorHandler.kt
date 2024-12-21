@@ -1,6 +1,6 @@
-package com.example.leanbackpocmvvm.vastdata.handler
+package com.example.leanbackpocmvvm.vastdata.validator
 
-import android.util.Log
+import timber.log.Timber
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -11,7 +11,7 @@ import javax.inject.Singleton
 @Singleton
 class VastErrorHandler @Inject constructor() {  // Remove parameters from primary constructor
 
-    private val maxErrorLogSize: Int = 100  // Move as property
+    private val maxErrorTimberSize: Int = 100  // Move as property
     private val shouldRetryOnError: (Throwable) -> Boolean = { error ->  // Move as property
         when (error) {
             is IOException,
@@ -20,7 +20,7 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
             else -> false
         }
     }
-    private val errorLog = ConcurrentLinkedQueue<ErrorEntry>()
+    private val errorTimber = ConcurrentLinkedQueue<ErrorEntry>()
 
     data class ErrorEntry(
         val error: Throwable,
@@ -42,14 +42,14 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
         operation: String? = null
     ) {
         val entry = ErrorEntry(error, System.currentTimeMillis(), vastId, operation)
-        errorLog.offer(entry)
+        errorTimber.offer(entry)
 
-        // Trim log if it exceeds max size
-        while (errorLog.size > maxErrorLogSize) {
-            errorLog.poll()
+        // Trim Timber if it exceeds max size
+        while (errorTimber.size > maxErrorTimberSize) {
+            errorTimber.poll()
         }
 
-        Log.e(TAG, "VAST Error - ID: $vastId, Operation: $operation", error)
+        Timber.e(TAG, "VAST Error - ID: $vastId, Operation: $operation", error)
     }
 
     fun shouldRetry(error: Throwable): Boolean {
@@ -57,7 +57,7 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
     }
 
     fun getErrorStats(): ErrorStats {
-        return errorLog.toList().let { errors ->
+        return errorTimber.toList().let { errors ->
             ErrorStats(
                 totalErrors = errors.size,
                 retryableErrors = errors.count { shouldRetryOnError(it.error) },
@@ -68,20 +68,20 @@ class VastErrorHandler @Inject constructor() {  // Remove parameters from primar
     }
 
     fun getErrorsForVastId(vastId: String): List<ErrorEntry> {
-        return errorLog.filter { it.vastId == vastId }
+        return errorTimber.filter { it.vastId == vastId }
     }
 
-    fun clearErrorLog() {
-        errorLog.clear()
+    fun clearErrorTimber() {
+        errorTimber.clear()
     }
 
     fun clearErrorsForVastId(vastId: String) {
-        errorLog.removeIf { it.vastId == vastId }
+        errorTimber.removeIf { it.vastId == vastId }
     }
 
     fun clearErrorsOlderThan(timeMs: Long) {
         val cutoffTime = System.currentTimeMillis() - timeMs
-        errorLog.removeIf { it.timestamp < cutoffTime }
+        errorTimber.removeIf { it.timestamp < cutoffTime }
     }
 
     companion object {

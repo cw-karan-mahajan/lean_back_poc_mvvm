@@ -1,9 +1,7 @@
-package com.example.leanbackpocmvvm.views.exoplayer
+package com.example.leanbackpocmvvm.vastdata.player
 
 import android.content.Context
 import android.os.Build
-import android.util.Log
-import android.view.Surface
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.C
@@ -25,6 +23,7 @@ import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import timber.log.Timber
 import java.io.File
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -44,7 +43,7 @@ class ExoPlayerManager @Inject constructor(
     }
 
     private var exoPlayer: ExoPlayer? = null
-    private var isPlayingVideo = AtomicBoolean(false)
+    var isPlayingVideo = AtomicBoolean(false)
     private var hasVideoEnded = AtomicBoolean(false)
     private var currentVideoUrl = ""
     private val trackedEvents = ConcurrentHashMap<String, MutableSet<String>>()
@@ -99,7 +98,7 @@ class ExoPlayerManager @Inject constructor(
                 currentAdNumber = adNumber
                 totalAdsCount = totalAds
 
-                Log.d(
+                Timber.d(
                     TAG,
                     "Starting video preparation - isPartOfSequence: $isPartOfSequence, Ad $adNumber/$totalAds"
                 )
@@ -133,7 +132,7 @@ class ExoPlayerManager @Inject constructor(
                     override fun onPlaybackStateChanged(state: Int) {
                         when (state) {
                             Player.STATE_READY -> {
-                                Log.d(TAG, "Video ready to play")
+                                Timber.d(TAG, "Video ready to play")
                                 startProgressTracking()
                                 onReady(true)
                                 isPlayingVideo.set(true)
@@ -141,7 +140,7 @@ class ExoPlayerManager @Inject constructor(
                             }
 
                             Player.STATE_ENDED -> {
-                                Log.d(TAG, "Video playback ended")
+                                Timber.d(TAG, "Video playback ended")
                                 stopProgressTracking()
                                 if (!isPartOfSequence) {
                                     releasePlayer()
@@ -152,13 +151,13 @@ class ExoPlayerManager @Inject constructor(
                             }
 
                             Player.STATE_BUFFERING -> {
-                                Log.d(TAG, "Video buffering")
+                                Timber.d(TAG, "Video buffering")
                             }
                         }
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
-                        Log.e(TAG, "Player error: ${error.message}", error)
+                        Timber.e(TAG, "Player error: ${error.message}", error)
                         stopProgressTracking()
                         onReady(false)
                         when (error.errorCode) {
@@ -186,7 +185,7 @@ class ExoPlayerManager @Inject constructor(
                 player.playWhenReady = true
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error preparing video: ${e.message}")
+                Timber.e(TAG, "Error preparing video: ${e.message}")
                 stopProgressTracking()
                 onReady(false)
             }
@@ -223,7 +222,7 @@ class ExoPlayerManager @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error tracking progress: ${e.message}")
+                Timber.e(TAG, "Error tracking progress: ${e.message}")
             }
         }
     }
@@ -296,7 +295,7 @@ class ExoPlayerManager @Inject constructor(
                     delay(200)
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error monitoring progress: ${e.message}")
+                Timber.e(TAG, "Error monitoring progress: ${e.message}")
             }
         }
     }

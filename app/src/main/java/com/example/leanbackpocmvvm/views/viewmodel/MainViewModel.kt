@@ -16,7 +16,7 @@ import com.example.leanbackpocmvvm.repository.VastRepository
 import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
-import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow

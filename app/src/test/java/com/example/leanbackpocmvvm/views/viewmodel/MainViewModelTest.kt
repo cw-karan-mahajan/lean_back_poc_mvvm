@@ -5,16 +5,13 @@ import androidx.lifecycle.Observer
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.repository.*
-import com.example.leanbackpocmvvm.utils.NetworkConnectivity
 import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
 import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
-import com.example.leanbackpocmvvm.views.exoplayer.ExoPlayerManager
+import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.*
 import org.junit.After
 import org.junit.Before
