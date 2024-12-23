@@ -13,10 +13,10 @@ import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.repository.VastRepository
-import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
-import com.example.leanbackpocmvvm.vastdata.parser.VastParser
-import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
-import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
+import tv.cloudwalker.adtech.vastdata.parser.VastAdSequenceManager
+import tv.cloudwalker.adtech.vastdata.parser.VastParser
+import tv.cloudwalker.adtech.vastdata.tracking.VastTrackingManager
+import tv.cloudwalker.adtech.player.ExoPlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow

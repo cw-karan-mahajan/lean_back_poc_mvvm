@@ -3,9 +3,9 @@ package com.example.leanbackpocmvvm.repository.impl
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.*
 import com.example.leanbackpocmvvm.remote.AdApiService
-import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
+import tv.cloudwalker.adtech.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.repository.AdRepository
-import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
+import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

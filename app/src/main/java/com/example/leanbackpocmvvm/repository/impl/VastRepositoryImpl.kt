@@ -2,12 +2,12 @@ package com.example.leanbackpocmvvm.repository.impl
 
 import android.content.Context
 import com.example.leanbackpocmvvm.core.Resource
-import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
+import tv.cloudwalker.adtech.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.remote.VastApiService
-import com.example.leanbackpocmvvm.vastdata.parser.VastParser
+import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import com.example.leanbackpocmvvm.repository.VastRepository
-import com.example.leanbackpocmvvm.vastdata.tracking.AdEventTracker
-import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
+import tv.cloudwalker.adtech.vastdata.tracking.AdEventTracker
+import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*

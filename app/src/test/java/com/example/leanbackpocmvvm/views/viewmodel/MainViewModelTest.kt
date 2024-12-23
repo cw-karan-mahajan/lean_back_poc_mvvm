@@ -5,9 +5,9 @@ import androidx.lifecycle.Observer
 import com.example.leanbackpocmvvm.core.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.repository.*
-import com.example.leanbackpocmvvm.vastdata.parser.VastAdSequenceManager
-import com.example.leanbackpocmvvm.vastdata.tracking.VastTrackingManager
-import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
+import tv.cloudwalker.adtech.vastdata.parser.VastAdSequenceManager
+import tv.cloudwalker.adtech.vastdata.tracking.VastTrackingManager
+import tv.cloudwalker.adtech.player.ExoPlayerManager
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi

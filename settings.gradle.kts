@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "LeanBackPocMvvm"
 include(":app")
- 
+include(":adtech")

@@ -5,7 +5,7 @@ import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.remote.ApiService
 import com.example.leanbackpocmvvm.repository.MainRepository1
 import com.example.leanbackpocmvvm.utils.getResponse
-import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
+import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch

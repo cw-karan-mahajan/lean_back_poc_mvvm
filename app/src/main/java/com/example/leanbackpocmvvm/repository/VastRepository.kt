@@ -1,7 +1,7 @@
 package com.example.leanbackpocmvvm.repository
 
 import com.example.leanbackpocmvvm.core.Resource
-import com.example.leanbackpocmvvm.vastdata.parser.VastParser
+import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import kotlinx.coroutines.flow.Flow
 
 interface VastRepository {

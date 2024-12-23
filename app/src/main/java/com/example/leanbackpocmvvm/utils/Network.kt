@@ -3,7 +3,7 @@ package com.example.leanbackpocmvvm.utils
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkInfo
-import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
+import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import javax.inject.Inject
 
 

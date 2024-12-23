@@ -3,13 +3,13 @@ package com.example.leanbackpocmvvm.di
 import android.content.Context
 import com.example.leanbackpocmvvm.core.Constants.BASE_URL
 import com.example.leanbackpocmvvm.remote.ApiService
-import com.example.leanbackpocmvvm.vastdata.network.DynamicApiServiceFactory
+import tv.cloudwalker.adtech.vastdata.network.DynamicApiServiceFactory
 import com.example.leanbackpocmvvm.remote.HeaderInterceptor
 import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.impl.AdRepositoryImpl
 import com.example.leanbackpocmvvm.utils.Network
-import com.example.leanbackpocmvvm.vastdata.network.NetworkConnectivity
+import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides

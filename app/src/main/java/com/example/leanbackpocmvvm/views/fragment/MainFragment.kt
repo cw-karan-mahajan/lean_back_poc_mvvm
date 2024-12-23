@@ -33,7 +33,7 @@ import com.example.leanbackpocmvvm.utils.NetworkChangeReceiver
 import com.example.leanbackpocmvvm.utils.isConnected
 import com.example.leanbackpocmvvm.views.activity.MainActivity
 import com.example.leanbackpocmvvm.views.customview.NewVideoCardView
-import com.example.leanbackpocmvvm.vastdata.player.ExoPlayerManager
+import tv.cloudwalker.adtech.player.ExoPlayerManager
 import com.example.leanbackpocmvvm.views.presenter.CardLayout1
 import com.example.leanbackpocmvvm.views.viewmodel.AutoScrollCommand
 import com.example.leanbackpocmvvm.views.viewmodel.CustomRowItemX
