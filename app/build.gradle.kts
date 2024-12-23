@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -46,17 +47,15 @@ android {
 dependencies {
     implementation(project(":adtech"))
 
-    // Core Android and UI
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.5.0")
-    implementation("androidx.leanback:leanback:1.0.0")
+    // Hilt
+    implementation("com.google.dagger:hilt-android:2.50")
+    kapt("com.google.dagger:hilt-android-compiler:2.50")
+
+    // Navigation - app specific
+    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 
-    // Navigation
-    implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
-
-    // Glide
+    // Glide - app specific
     implementation("com.github.bumptech.glide:glide:4.13.0")
     kapt("com.github.bumptech.glide:compiler:4.13.0")
 }

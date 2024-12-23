@@ -3,11 +3,11 @@ package tv.cloudwalker.adtech.vastdata.validator
 import android.content.Context
 import android.util.DisplayMetrics
 import android.view.WindowManager
-import com.example.leanbackpocmvvm.utils.getBandwidthBasedMaxBitrate
-import com.example.leanbackpocmvvm.utils.getSupportedCodecs
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
+import tv.cloudwalker.adtech.utils.getBandwidthBasedMaxBitrate
+import tv.cloudwalker.adtech.utils.getSupportedCodecs
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs

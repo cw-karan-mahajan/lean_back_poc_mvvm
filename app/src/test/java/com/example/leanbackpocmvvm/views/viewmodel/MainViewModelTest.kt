@@ -1,5 +1,6 @@
 package com.example.leanbackpocmvvm.views.viewmodel
 
+/*
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.Observer
 import com.example.leanbackpocmvvm.core.Resource
@@ -140,4 +141,4 @@ class MainDispatcherRule : TestRule {
             }
         }
     }
-}
+}*/

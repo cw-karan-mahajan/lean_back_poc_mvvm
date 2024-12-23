@@ -11,8 +11,6 @@ import com.bumptech.glide.GlideBuilder
 import com.bumptech.glide.MemoryCategory
 import com.bumptech.glide.load.engine.cache.LruResourceCache
 import dagger.hilt.android.HiltAndroidApp
-import timber.log.Timber
-import timber.log.Timber.Forest.plant
 
 @HiltAndroidApp
 class AvLeanback : Application(), ComponentCallbacks2 {
@@ -37,7 +35,7 @@ class AvLeanback : Application(), ComponentCallbacks2 {
 
     private fun settingTimber() {
         //if (BuildConfig.DEBUG) {
-        plant(Timber.DebugTree())
+        //plant(Timber.DebugTree())
         /*} else {
             plant(NoLoggingTree())
         }*/

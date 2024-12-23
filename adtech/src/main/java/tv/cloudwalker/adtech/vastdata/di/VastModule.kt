@@ -33,6 +33,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object VastModule {
+
     @Provides
     @Singleton
     fun provideGson(): Gson {
@@ -41,13 +42,20 @@ object VastModule {
 
     @Provides
     @Singleton
-    fun provideVastHttpClient(): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
+    fun provideRetrofitBuilder(): Retrofit.Builder {
+        return Retrofit.Builder()
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(provideGson()))
+    }
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClientBuilder(): OkHttpClient.Builder {
         return OkHttpClient.Builder()
             .hostnameVerifier { _, _ -> true }
-            .addInterceptor(loggingInterceptor)
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            })
             .addInterceptor { chain ->
                 val original = chain.request()
                 val requestBuilder = original.newBuilder()
@@ -59,17 +67,21 @@ object VastModule {
             .readTimeout(5, TimeUnit.SECONDS)
             .writeTimeout(5, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
-            .build()
     }
 
     @Provides
     @Singleton
-    fun provideDynamicApiServiceFactory(): DynamicApiServiceFactory {
-        val retrofitBuilder = Retrofit.Builder()
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .addConverterFactory(GsonConverterFactory.create(provideGson()))
+    fun provideVastHttpClient(builder: OkHttpClient.Builder): OkHttpClient {
+        return builder.build()
+    }
 
-        return DynamicApiServiceFactory(retrofitBuilder, provideVastHttpClient().newBuilder())
+    @Provides
+    @Singleton
+    fun provideDynamicApiServiceFactory(
+        retrofitBuilder: Retrofit.Builder,
+        okHttpClientBuilder: OkHttpClient.Builder
+    ): DynamicApiServiceFactory {
+        return DynamicApiServiceFactory(retrofitBuilder, okHttpClientBuilder)
     }
 
     @Provides

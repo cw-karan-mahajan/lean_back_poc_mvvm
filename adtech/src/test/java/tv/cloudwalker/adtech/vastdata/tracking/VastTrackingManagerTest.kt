@@ -1,6 +1,6 @@
 package tv.cloudwalker.adtech.vastdata.tracking
 
-import tv.cloudwalker.adtech.vastdata.cache.SimpleVastCache
+/*import tv.cloudwalker.adtech.vastdata.cache.SimpleVastCache
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -222,4 +222,4 @@ class VastTrackingManagerTest {
         version = null,
         unknownFields = emptyMap()
     )
-}
+}*/

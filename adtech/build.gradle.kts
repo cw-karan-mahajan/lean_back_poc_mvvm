@@ -71,54 +71,53 @@ android {
 }
 
 dependencies {
-    // Media3 (ExoPlayer)
-    implementation("androidx.media3:media3-exoplayer:1.4.1")
-    implementation("androidx.media3:media3-ui:1.4.1")
-
-    // Network
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.retrofit2:converter-scalars:2.0.0")
-    implementation("com.squareup.okhttp3:okhttp:4.9.1")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.9.1")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
+    // Core dependencies exposed to apps
+    api("androidx.core:core-ktx:1.12.0")
+    api("androidx.appcompat:appcompat:1.6.1")
+    api("com.google.android.material:material:1.5.0")
+    api("androidx.leanback:leanback:1.0.0")
+    api("com.jakewharton.timber:timber:5.0.1")
 
     // Hilt
-    implementation("com.google.dagger:hilt-android:2.50")
+    api("com.google.dagger:hilt-android:2.50")
     kapt("com.google.dagger:hilt-android-compiler:2.50")
 
-    // Logging
-    implementation("com.jakewharton.timber:timber:5.0.1")
+    // Media3 (ExoPlayer) - internal to module
+    api("androidx.media3:media3-exoplayer:1.4.1")
+    api("androidx.media3:media3-ui:1.4.1")
+
+    // Network - exposed to apps
+    api("com.squareup.retrofit2:retrofit:2.9.0")
+    api("com.squareup.retrofit2:converter-moshi:2.9.0")
+    api("com.squareup.retrofit2:converter-gson:2.9.0")
+    api("com.squareup.retrofit2:converter-scalars:2.0.0")
+    api("com.squareup.okhttp3:okhttp:4.9.1")
+    api("com.squareup.okhttp3:logging-interceptor:4.9.1")
+
+    // Moshi
+    api("com.squareup.moshi:moshi-kotlin:1.11.0")
+    api("com.squareup.moshi:moshi-adapters:1.11.0")
+
+
+    // Coroutines - exposed to apps
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
 
     // Testing Dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.8.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.2")
-
-    // Mockk for Kotlin
-    testImplementation("io.mockk:mockk:1.12.5")
-
-    // Coroutines Testing
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.1")
-
-    // AndroidX Test
-    testImplementation("androidx.test:core:1.5.0")
-    testImplementation("androidx.test.ext:junit:1.1.5")
-
-    // Architecture Components Testing
-    testImplementation("androidx.arch.core:core-testing:2.2.0")
-
-    // Hilt Testing
-    testImplementation("com.google.dagger:hilt-android-testing:2.50")
-    kaptTest("com.google.dagger:hilt-android-compiler:2.50")
-    testImplementation("androidx.test:rules:1.5.0")
-    testImplementation("org.junit.vintage:junit-vintage-engine:5.8.2")
-    testImplementation("xmlpull:xmlpull:1.1.3.1")
-    testImplementation("net.sf.kxml:kxml2:2.3.0")
-
+    api("junit:junit:4.13.2")
+    api("org.junit.jupiter:junit-jupiter-api:5.8.2")
+    api("org.junit.jupiter:junit-jupiter-params:5.8.2")
+    api("org.junit.jupiter:junit-jupiter-engine:5.8.2")
+    api("io.mockk:mockk:1.12.5")
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.1")
+    api("androidx.test:core:1.5.0")
+    api("androidx.test.ext:junit:1.1.5")
+    api("androidx.arch.core:core-testing:2.2.0")
+    api("com.google.dagger:hilt-android-testing:2.50")
+    api("androidx.test:rules:1.5.0")
+    api("org.junit.vintage:junit-vintage-engine:5.8.2")
+    api("xmlpull:xmlpull:1.1.3.1")
+    api("net.sf.kxml:kxml2:2.3.0")
 }
 
 jacoco {

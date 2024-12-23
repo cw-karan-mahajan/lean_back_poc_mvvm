@@ -53,13 +53,14 @@ object AppModule {
     @Provides
     @Singleton
     fun provideApiService(
-        retrofitBuilder: Retrofit.Builder,
-        okHttpClientBuilder: OkHttpClient.Builder,
+        retrofitBuilder: Retrofit.Builder,  // This comes from VastModule
+        okHttpClientBuilder: OkHttpClient.Builder,  // This comes from VastModule
         headerInterceptor: HeaderInterceptor
     ): ApiService {
         val client = okHttpClientBuilder
             .addInterceptor(headerInterceptor)
             .build()
+
         return retrofitBuilder
             .baseUrl(BASE_URL)
             .client(client)

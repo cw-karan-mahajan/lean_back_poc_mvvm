@@ -2,10 +2,10 @@ package tv.cloudwalker.adtech.vastdata.tracking
 
 import android.util.Log
 import tv.cloudwalker.adtech.vastdata.parser.VastParser.VastAd
-import com.example.leanbackpocmvvm.utils.NetworkConnectivity
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
