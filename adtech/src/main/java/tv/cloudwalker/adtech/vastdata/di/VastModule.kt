@@ -2,6 +2,7 @@ package tv.cloudwalker.adtech.vastdata.di
 
 import android.content.Context
 import androidx.media3.common.util.UnstableApi
+import com.google.gson.Gson
 import tv.cloudwalker.adtech.vastdata.network.DynamicApiServiceFactory
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import tv.cloudwalker.adtech.vastdata.tracking.AdEventTracker
@@ -12,8 +13,6 @@ import tv.cloudwalker.adtech.vastdata.parser.VastAdSequenceManager
 import tv.cloudwalker.adtech.vastdata.tracking.VastTrackingManager
 import tv.cloudwalker.adtech.vastdata.validator.VastMediaSelector
 import tv.cloudwalker.adtech.player.ExoPlayerManager
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,20 +37,6 @@ object VastModule {
 
     @Provides
     @Singleton
-    fun provideGson(): Gson {
-        return GsonBuilder().setLenient().disableHtmlEscaping().serializeNulls().create()
-    }
-
-    @Provides
-    @Singleton
-    fun provideRetrofitBuilder(): Retrofit.Builder {
-        return Retrofit.Builder()
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .addConverterFactory(GsonConverterFactory.create(provideGson()))
-    }
-
-    @Provides
-    @Singleton
     fun provideOkHttpClientBuilder(): OkHttpClient.Builder {
         return OkHttpClient.Builder()
             .hostnameVerifier { _, _ -> true }
@@ -69,6 +54,14 @@ object VastModule {
             .readTimeout(5, TimeUnit.SECONDS)
             .writeTimeout(5, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
+    }
+
+    @Provides
+    @Singleton
+    fun provideRetrofitBuilder(gson: Gson): Retrofit.Builder {
+        return Retrofit.Builder()
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
     }
 
     @Provides
