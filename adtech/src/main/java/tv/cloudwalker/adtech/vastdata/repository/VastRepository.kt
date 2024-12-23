@@ -1,8 +1,8 @@
-package com.example.leanbackpocmvvm.repository
+package tv.cloudwalker.adtech.vastdata.repository
 
-import com.example.leanbackpocmvvm.core.Resource
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import kotlinx.coroutines.flow.Flow
+import tv.cloudwalker.adtech.vastdata.network.Resource
 
 interface VastRepository {
     suspend fun parseVastAd(vastUrl: String, tileId: String): Flow<Resource<List<VastParser.VastAd>>>

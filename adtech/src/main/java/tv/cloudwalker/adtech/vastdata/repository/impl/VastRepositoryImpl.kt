@@ -1,11 +1,9 @@
-package com.example.leanbackpocmvvm.repository.impl
+package tv.cloudwalker.adtech.vastdata.repository.impl
 
 import android.content.Context
-import com.example.leanbackpocmvvm.core.Resource
 import tv.cloudwalker.adtech.vastdata.network.DynamicApiServiceFactory
-import com.example.leanbackpocmvvm.remote.VastApiService
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
-import com.example.leanbackpocmvvm.repository.VastRepository
+import tv.cloudwalker.adtech.vastdata.repository.VastRepository
 import tv.cloudwalker.adtech.vastdata.tracking.AdEventTracker
 import tv.cloudwalker.adtech.vastdata.network.NetworkConnectivity
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -15,6 +13,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okio.IOException
 import timber.log.Timber
+import tv.cloudwalker.adtech.vastdata.network.Resource
+import tv.cloudwalker.adtech.vastdata.network.VastApiService
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.util.concurrent.ConcurrentHashMap
@@ -202,7 +202,8 @@ class VastRepositoryImpl @Inject constructor(
 
         Timber.d(TAG, "------- MediaFiles (${vastAd.mediaFiles.size}) -------")
         vastAd.mediaFiles.forEach { mediaFile ->
-            Timber.d(TAG, """
+            Timber.d(
+                TAG, """
                 MediaFile:
                 - URL: ${mediaFile.url}
                 - Bitrate: ${mediaFile.bitrate}
@@ -249,11 +250,8 @@ class VastRepositoryImpl @Inject constructor(
         }
     }
 
-
-
     companion object {
         private const val TAG = "VastRepositoryImpl"
-        private const val TIMEOUT_MS = 10000L
         private const val MAX_RETRY_ATTEMPTS = 3
         private const val RETRY_DELAY_MS = 1000L
     }

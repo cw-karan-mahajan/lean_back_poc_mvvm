@@ -1,7 +1,7 @@
 package com.example.leanbackpocmvvm.repository
 
 import android.content.Context
-import com.example.leanbackpocmvvm.core.Resource
+import tv.cloudwalker.adtech.vastdata.network.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.google.gson.Gson
 import dagger.hilt.android.qualifiers.ApplicationContext

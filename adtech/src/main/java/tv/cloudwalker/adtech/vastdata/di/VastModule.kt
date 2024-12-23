@@ -27,6 +27,8 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
 import tv.cloudwalker.adtech.utils.getBandwidthBasedMaxBitrate
 import tv.cloudwalker.adtech.utils.getSupportedCodecs
 import tv.cloudwalker.adtech.utils.isAndroidVersion9Supported
+import tv.cloudwalker.adtech.vastdata.repository.VastRepository
+import tv.cloudwalker.adtech.vastdata.repository.impl.VastRepositoryImpl
 import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
@@ -101,6 +103,26 @@ object VastModule {
             networkConnectivity = networkConnectivity,
             retryAttempts = 3,
             retryDelayMs = 1000L
+        )
+    }
+
+    @Provides
+    @Singleton
+    fun provideVastRepository(
+        vastParser: VastParser,
+        @ApplicationContext context: Context,
+        networkConnectivity: NetworkConnectivity,
+        okHttpClient: OkHttpClient,
+        adEventTracker: AdEventTracker,
+        dynamicApiServiceFactory: DynamicApiServiceFactory
+    ): VastRepository {
+        return VastRepositoryImpl(
+            vastParser = vastParser,
+            context = context,
+            networkConnectivity = networkConnectivity,
+            httpClient = okHttpClient,
+            adEventTracker = adEventTracker,
+            dynamicApiServiceFactory = dynamicApiServiceFactory
         )
     }
 

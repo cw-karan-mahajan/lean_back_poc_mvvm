@@ -5,14 +5,14 @@ import androidx.annotation.OptIn
 import androidx.lifecycle.*
 import androidx.leanback.widget.*
 import androidx.media3.common.util.UnstableApi
-import com.example.leanbackpocmvvm.core.Resource
+import tv.cloudwalker.adtech.vastdata.network.Resource
 import com.example.leanbackpocmvvm.models.AdResponse
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.models.RowItemX
 import com.example.leanbackpocmvvm.repository.AdRepository
 import com.example.leanbackpocmvvm.repository.MainRepository
 import com.example.leanbackpocmvvm.repository.MainRepository1
-import com.example.leanbackpocmvvm.repository.VastRepository
+import tv.cloudwalker.adtech.vastdata.repository.VastRepository
 import tv.cloudwalker.adtech.vastdata.parser.VastAdSequenceManager
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import tv.cloudwalker.adtech.vastdata.tracking.VastTrackingManager

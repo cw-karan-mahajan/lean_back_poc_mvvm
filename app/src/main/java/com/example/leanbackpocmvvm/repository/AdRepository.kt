@@ -1,8 +1,7 @@
 package com.example.leanbackpocmvvm.repository
 
-import com.example.leanbackpocmvvm.core.Resource
+import tv.cloudwalker.adtech.vastdata.network.Resource
 import com.example.leanbackpocmvvm.models.AdResponse
-import retrofit2.Response
 
 interface AdRepository {
     suspend fun fetchAds(adUrls: List<String>): List<Pair<String, Resource<AdResponse>>>

@@ -1,4 +1,4 @@
-package com.example.leanbackpocmvvm.core
+package tv.cloudwalker.adtech.vastdata.network
 
 
 sealed class Resource<T> {

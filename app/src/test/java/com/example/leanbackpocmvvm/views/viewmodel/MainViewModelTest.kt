@@ -3,7 +3,7 @@ package com.example.leanbackpocmvvm.views.viewmodel
 /*
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.lifecycle.Observer
-import com.example.leanbackpocmvvm.core.Resource
+import tv.cloudwalker.adtech.vastdata.network.Resource
 import com.example.leanbackpocmvvm.models.MyData2
 import com.example.leanbackpocmvvm.repository.*
 import tv.cloudwalker.adtech.vastdata.parser.VastAdSequenceManager

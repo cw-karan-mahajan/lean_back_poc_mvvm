@@ -29,10 +29,3 @@ interface AdApiService {
     ): Response<Unit>
 }
 
-interface VastApiService {
-    @GET
-    suspend fun getVastXml(
-        @Url path: String,
-        @QueryMap queryParams: Map<String, String> = emptyMap()
-    ): Response<String>
-}

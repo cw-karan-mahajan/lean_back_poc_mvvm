@@ -1,6 +1,6 @@
 package com.example.leanbackpocmvvm.repository.impl
 
-import com.example.leanbackpocmvvm.core.Resource
+import tv.cloudwalker.adtech.vastdata.network.Resource
 import com.example.leanbackpocmvvm.models.*
 import com.example.leanbackpocmvvm.remote.AdApiService
 import tv.cloudwalker.adtech.vastdata.network.DynamicApiServiceFactory
