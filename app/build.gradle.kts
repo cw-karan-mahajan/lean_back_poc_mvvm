@@ -58,4 +58,8 @@ dependencies {
     // Glide - app specific
     implementation("com.github.bumptech.glide:glide:4.13.0")
     kapt("com.github.bumptech.glide:compiler:4.13.0")
+
+    // Hilt Testing
+    testImplementation("com.google.dagger:hilt-android-testing:2.50")
+    kaptTest("com.google.dagger:hilt-android-compiler:2.50")
 }

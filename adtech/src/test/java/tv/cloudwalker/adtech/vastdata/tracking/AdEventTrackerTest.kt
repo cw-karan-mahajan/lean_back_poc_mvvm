@@ -1,6 +1,6 @@
 package tv.cloudwalker.adtech.vastdata.tracking
 
-/*
+
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -469,4 +469,4 @@ class AdEventTrackerTest {
         version = null,
         unknownFields = emptyMap()
     )
-}*/
+}

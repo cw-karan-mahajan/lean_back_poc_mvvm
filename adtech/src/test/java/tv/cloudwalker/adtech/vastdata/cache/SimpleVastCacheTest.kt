@@ -1,6 +1,6 @@
 package tv.cloudwalker.adtech.vastdata.cache
 
-/*
+
 import android.content.Context
 import tv.cloudwalker.adtech.vastdata.parser.VastParser
 import com.google.gson.Gson
@@ -196,4 +196,4 @@ class SimpleVastCacheTest {
         clickThrough = "http://example.com/click",
         clickTracking = "http://example.com/track"
     )
-}*/
+}
