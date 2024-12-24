@@ -1,6 +1,6 @@
 package tv.cloudwalker.adtech.vastdata.validator
 
-/*
+
 import android.content.Context
 import android.util.DisplayMetrics
 import android.view.WindowManager
@@ -309,4 +309,4 @@ class VastMediaSelectorTest {
         clickTracking = "https://vid-io-sin.springserve.com/vd/i?event=js_click",
         extensions = mapOf("springserve_SpringServeCreativeId" to "681a1e5e65dbc04489e7fcd578925ade")
     )
-}*/
+}
